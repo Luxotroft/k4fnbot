@@ -1,14 +1,4 @@
-remaining_minutes = int(remaining_seconds / 60)
-                
-                emoji = self.pi_emojis.get(timer['tipo_base'], '⏱️')
-                tipo_formateado = timer['tipo_completo'].upper()
-
-                if remaining_minutes <= 0:
-                    mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ✅ *¡Ya pasó el timer!*"
-                    await msg.edit(content=mensaje)
-                    expired.append(msg_id)
-                else:
-                    tiempoimport discord
+import discord
 from discord.ext import commands, tasks
 import time
 import re
@@ -175,8 +165,6 @@ class PiCog(commands.Cog):
             tiempo_formateado = self.format_time_remaining(tiempo_minutos)
             
             mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo_formateado} restantes*"
-            
-
 
             msg = await ctx.send(mensaje)
 
