@@ -19,16 +19,28 @@ class PiCog(commands.Cog):
         """Crea temporizadores P.I. con !pi (ej: !pi vortex azul 20 Bridgewatch)"""
         try:
             # Parseo inteligente de argumentos
-            parts = args.split()
+            parts = args.rsplit(' ', 2) # Divide desde la derecha, máximo 2 veces
+
             if len(parts) < 3:
-                await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Bridgewatch`")
-                return
-
-            # Manejo de tipos compuestos (como "vortex azul")
-            tipo = ' '.join(parts[:-2]) if len(parts) > 3 else parts[0]
-            tiempo = int(parts[-2])
-            ubicacion = parts[-1]
-
+                # Intenta con menos partes para tipos de un solo nombre
+                parts = args.rsplit(' ', 1)
+                if len(parts) < 2:
+                    await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
+                    return
+                tipo = parts[0]
+                tiempo_str = parts[1]
+                ubicacion = "desconocida" # Valor por defecto si no se da ubicación
+            else:
+                tipo = parts[0]
+                tiempo_str = parts[1]
+                ubicacion = parts[2]
+            
+            # Quitar espacios extra alrededor
+            tipo = tipo.strip()
+            ubicacion = ubicacion.strip()
+            
+            tiempo = int(tiempo_str)
+            
             # Validación básica
             if tiempo <= 0:
                 await ctx.send("**❌ El tiempo debe ser mayor a 0 minutos**")
@@ -57,7 +69,7 @@ class PiCog(commands.Cog):
                 self.update_timers.start()
 
         except ValueError:
-            await ctx.send("**❌ El tiempo debe ser un número entero** (ej: `!pi vortex azul 20 Bridgewatch`)")
+            await ctx.send("**❌ El tiempo debe ser un número entero** (ej: `!pi vortex azul 20 Fort Sterling`)")
         except Exception as e:
             print(f"Error en !pi: {e}")
             await ctx.send("**❌ Error al crear el timer**")
@@ -70,6 +82,10 @@ class PiCog(commands.Cog):
         for msg_id, data in self.pi_countdown_data.items():
             try:
                 channel = self.bot.get_channel(data['channel_id'])
+                if channel is None:
+                    to_remove.append(msg_id)
+                    continue
+
                 msg = await channel.fetch_message(msg_id)
                 remaining = int((data['end_time'] - now) / 60)
                 
@@ -84,8 +100,11 @@ class PiCog(commands.Cog):
                     embed.description = f"**📍 Ubicación:** {data['ubicacion']}\n**⏳ Aparece en:** **{remaining} minutos**"
                     await msg.edit(embed=embed)
                     
+            except (discord.NotFound, discord.Forbidden):
+                # El mensaje o el canal ya no existen
+                to_remove.append(msg_id)
             except Exception as e:
-                print(f"Error actualizando timer: {e}")
+                print(f"Error actualizando timer (mensaje {msg_id}): {e}")
                 to_remove.append(msg_id)
         
         for msg_id in to_remove:
