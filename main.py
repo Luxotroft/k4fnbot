@@ -1338,6 +1338,7 @@ async def cleanup_roaming_events():
 @cleanup_roaming_events.before_loop
 async def before_cleanup_roaming():
     await bot.wait_until_ready()
+    await bot.load_extension('builds')
 
 # ====================================================================
 # --- 8. EJECUCIÓN DEL BOT ---
