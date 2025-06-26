@@ -18,13 +18,11 @@ load_dotenv()
 # Habilitar intents necesarios para el bot
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True  # Necesario para obtener miembros del guild
-# Para versiones más recientes de discord.py (2.0+)
-intents.guilds = True  # Necesario para manejar hilos
-intents.messages = True  # Necesario para manejar mensajes en hilos
+intents.members = True # Necesario para obtener miembros del guild
 
 # Crear la única instancia del bot. Soporta prefijo (!) y slash commands.
 bot = commands.Bot(command_prefix="!", intents=intents)
+
 # ====================================================================
 # --- 2. VARIABLES GLOBALES Y ESTRUCTURAS DE DATOS ---
 # ====================================================================
@@ -88,6 +86,8 @@ WB_BOSS_DATA = {
         )
     }
 }
+wb_events = {} # {event_id: {data}}
+wb_priority_users = {} # {event_id: {"users": [], "expiry": timestamp, "slots": int}}
 
 # --- Datos para Roaming Parties ---
 ROAMING_PARTIES = {
@@ -150,7 +150,7 @@ ROAMING_PARTIES = {
             "Maza pesada": 1,
             "Martillo de una mano": 1,
             "Baston de equilibrio": 1,
-            "Santificador": 3,
+            "Santificador": 3,  # 3 slots para Santificador
             "Infortunio": 1,
             "Juradores": 1,
             "Silvano": 1,
@@ -158,8 +158,8 @@ ROAMING_PARTIES = {
             "Putrefacto": 1,
             "Tallada": 1,
             "Astral": 1,
-            "Patas de oso": 1,
-            "Hoja infinita": 3,
+            "Patas de oso": 3,  # 3 slots para Patas de oso
+            "Hoja infinita": 1,
             "Colmillo": 1,
             "Guadaña": 1,
             "Puas": 1
@@ -177,7 +177,7 @@ ROAMING_PARTIES = {
             "Tallada": "<:Tallada:1290881286092886172>",
             "Astral": "<:Astral:1334556937328525413>",
             "Patas de oso": "<:PatasDeOso:1272599457778630737>",
-            "Hoja infinita": "⚔️",
+            "Hoja infinita": "⚔️",  # Emoji genérico de espada
             "Colmillo": "<:Colmillo:1370577697516032031>",
             "Guadaña": "<:Guadaa:1291468660917014538>",
             "Puas": "<:Puas:1291468593506029638>"
@@ -204,7 +204,6 @@ ROAMING_PARTIES = {
         }
     }
 }
-
 wb_events = {} # {event_id: {data}}
 wb_priority_users = {} # {event_id: {"users": [], "expiry": timestamp, "slots": int}}
 
@@ -241,6 +240,18 @@ def create_roaming_embed(party, event_data):
     total_inscritos = sum(len(players) for players in event_data["inscripciones"].values())
     embed.set_footer(text=f"📊 {total_inscritos}/{ROAMING_PARTIES[party]['max_players']} jugadores | ID: {event_data['event_id']}")
 
+    # Agrega la hora si está presente
+    if event_data.get("time"):
+        # CAMBIO: Agregamos 'UTC' al final de la hora si no lo tiene.
+        display_time = event_data["time"]
+        if not display_time.upper().endswith('UTC'):
+            display_time += 'UTC'
+        embed.add_field(name="⏰ Hora de Salida", value=display_time, inline=True)
+    
+    # Agrega la información de swap de gank
+    swap_status = "✅ **Sí**" if event_data.get("swap_gank") else "❌ **No**"
+    embed.add_field(name="⚔️ Swap de Gank", value=swap_status, inline=True)
+    
     # Lista de roles
     lineas_roles = []
     for rol, limite in ROAMING_PARTIES[party]["roles"].items():
@@ -351,7 +362,7 @@ async def update_wb_embed(event_id):
                 inline=False
             )
 
-        view = WB_RoleSelectorView(boss, event_id, event["caller_id"], disabled=is_disabled)
+        view = WB_RoleSelectorView(boss, event_id, event["caller_id"], disabled=is_disabled) # NOTA: Se crea una nueva vista en cada actualización
         await message.edit(embed=embed, view=view)
 
     except Exception as e:
@@ -363,6 +374,7 @@ async def update_wb_embed(event_id):
 
 # --- Clases para World Boss (WB) ---
 class WB_RoleSelectorView(discord.ui.View):
+    # --- MODIFICACIÓN: Se añade 'caller_id' para el botón de cerrar ---
     def __init__(self, boss, event_id, caller_id, disabled=False):
         super().__init__(timeout=None)
         self.caller_id = caller_id
@@ -371,35 +383,34 @@ class WB_RoleSelectorView(discord.ui.View):
         self.add_item(WB_LeaveButton(event_id))
         self.add_item(WB_JoinWaitlistMainButton(boss, event_id))
 
+    # --- NUEVO: Botón para cerrar el evento ---
     @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", row=1)
     async def close_event_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 1. Verificar si el usuario que presiona el botón es el caller original
         if interaction.user.id != self.caller_id:
             return await interaction.response.send_message("❌ Solo el que lanzó el evento puede cerrarlo.", ephemeral=True)
 
+        # 2. Verificar si el evento sigue activo
         if self.event_id not in wb_events:
             return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
 
+        # 3. Actualizar el embed para mostrar que el evento está cerrado
         event_data = wb_events[self.event_id]
         embed = interaction.message.embeds[0]
         embed.title = f"🚫 WORLD BOSS: {event_data['boss'].upper()} (CERRADO)"
-        embed.description = f"**Este evento ha sido cerrado por: {interaction.user.display_name}**"
+        embed.description = f"**Este evento ha sido cerrado por el caller: {interaction.user.display_name}**"
         embed.color = discord.Color.red()
 
-        # Deshabilitar componentes
+        # 4. Deshabilitar todos los componentes de la vista
         for item in self.children:
             item.disabled = True
 
-        # Eliminar el hilo asociado si existe
-        if interaction.message.thread:
-            try:
-                await interaction.message.thread.delete()
-            except Exception as e:
-                print(f"Error al eliminar hilo de WB: {e}")
-
-        # Eliminar del diccionario y actualizar mensaje
+        # 5. Eliminar el evento del diccionario global
         del wb_events[self.event_id]
+
+        # 6. Editar el mensaje con el embed actualizado y la vista deshabilitada
         await interaction.response.edit_message(embed=embed, view=self)
-        await interaction.followup.send("✅ Evento de World Boss cerrado correctamente.", ephemeral=True)
+        await interaction.followup.send(f"✅ Evento de World Boss cerrado correctamente.", ephemeral=True)
 
 class WB_RoleDropdown(discord.ui.Select):
     def __init__(self, boss, event_id, disabled=False):
@@ -596,7 +607,7 @@ class WB_WaitlistRoleDropdown(discord.ui.Select):
 
         # Re-check if role is still full
         if len(event["inscriptions"][role]) < WB_BOSS_DATA[self.boss]["roles"][role]:
-            await interaction.response.send_message(f"✅ ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
+            await interaction.response.send_message(f"🎉 ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
             await update_wb_embed(self.event_id) # Update embed to reflect open slot
             return
 
@@ -758,25 +769,18 @@ class RoamingEventView(discord.ui.View):
         # 2. Actualizar el embed para mostrar que el evento está cerrado
         embed = interaction.message.embeds[0]
         embed.title = f"🚫 ROAMING {self.event_data['party'].upper()} (CERRADO)"
-        embed.description = f"**Este evento ha sido cerrado por: {interaction.user.display_name}**"
+        embed.description = f"**Este evento ha sido cerrado por el caller: {interaction.user.display_name}**"
         embed.color = discord.Color.red()
 
         # Deshabilitar todos los componentes de la vista
         for item in self.children:
             item.disabled = True
 
-        # 3. Eliminar el hilo asociado si existe
-        if interaction.message.thread:
-            try:
-                await interaction.message.thread.delete()
-            except Exception as e:
-                print(f"Error al eliminar hilo de Roaming: {e}")
-
-        # 4. Eliminar el evento del diccionario global
+        # 3. Eliminar el evento del diccionario global
         if self.event_id in roaming_events:
             del roaming_events[self.event_id]
 
-        # 5. Actualizar el mensaje
+        # 4. Actualizar el mensaje
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"✅ Evento de roaming `{self.event_id}` cerrado correctamente.", ephemeral=True)
 
@@ -819,13 +823,6 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
 
                     await message_to_edit.edit(embed=embed, view=view)
 
-                    # Eliminar el hilo asociado si existe
-                    if message_to_edit.thread:
-                        try:
-                            await message_to_edit.thread.delete()
-                        except Exception as e:
-                            print(f"Error al eliminar hilo de WB: {e}")
-
                 except discord.NotFound:
                     print(f"Mensaje para el evento WB {eid} no encontrado. No se puede editar.")
                 except Exception as e:
@@ -859,13 +856,6 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
                             item.disabled = True
 
                         await message_to_edit.edit(embed=embed, view=view)
-
-                        # Eliminar el hilo asociado si existe
-                        if message_to_edit.thread:
-                            try:
-                                await message_to_edit.thread.delete()
-                            except Exception as e:
-                                print(f"Error al eliminar hilo de Roaming: {e}")
 
                     except discord.NotFound:
                         print(f"Mensaje para el evento Roaming {eid} no encontrado. No se puede editar.")
@@ -1028,18 +1018,26 @@ async def wb_slash(
 
 # --- Comandos de Prefijo para Roaming ---
 @bot.command(name='roaming', aliases=['r'])
-async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
+async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, time_str: str = None, swap_gank: str = "no", *args):
     """
-    Crea un evento de roaming con la opción de asignar un caller.
-    Ej: !r kiteo1 8 1400 (caller es el que envía el comando)
-    Ej: !r kiteo1 8 1400 Pepito (caller es Pepito)
+    Crea un evento de roaming con opciones de hora y swap de gank.
+    Ej: !r kiteo1 T8 1400 3.30UTC si pepito
+    Ej: !r brawl T7 1300 no
     """
     party_lower = party.lower()
     if party_lower not in ROAMING_PARTIES:
         return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
-
+    
     # Determina el nombre del caller a mostrar en el embed usando la nueva lógica
     caller_display = get_roaming_caller_info(ctx, args)
+    
+    # Maneja los argumentos para obtener la hora, swap y caller_display
+    # Esto es un poco más complejo debido a que los argumentos posicionales pueden variar
+    
+    # Revisa si el último argumento es 'si' o 'no'
+    swap_gank_status = False
+    if swap_gank.lower() == 'si':
+        swap_gank_status = True
 
     event_id = f"{ctx.author.id}-{int(time.time())}"
 
@@ -1056,6 +1054,8 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
         "party": party_lower,
         "tier_min": tier.upper(),
         "ip_min": ip,
+        "time": time_str, # Agregamos el campo de la hora
+        "swap_gank": swap_gank_status, # Agregamos el campo de swap de gank
         "start_time": time.time(),
         "message": None,
         "inscripciones": inscripciones_dict,
@@ -1096,142 +1096,46 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
 # --- 6. EVENTOS DEL BOT ---
 # ====================================================================
 
-@bot.command(name='roaming', aliases=['r'])
-async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
-    """
-    Crea un evento de roaming con la opción de asignar un caller.
-    Ej: !r kiteo1 8 1400 (caller es el que envía el comando)
-    Ej: !r kiteo1 8 1400 Pepito (caller es Pepito)
-    Ej: !r brawl2 T8 1450 IsaelOC Gank 3.30 UTC
-    """
-    party_lower = party.lower()
-    if party_lower not in ROAMING_PARTIES:
-        return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
+@bot.event
+async def on_ready():
+    """Se ejecuta cuando el bot está listo y conectado a Discord."""
+    print(f'Logged in as {bot.user.name} ({bot.user.id})')
+    print('------')
 
-    # Procesar los argumentos adicionales
-    additional_info = []
-    gank_info = ""
-    utc_time = ""
-    caller_args = []
-    
-    # Separar los argumentos del caller y la información adicional
-    for arg in args:
-        arg_lower = arg.lower()
-        if arg_lower == "gank":
-            gank_info = "Swap de gankeo"
-        elif "utc" in arg_lower:
-            utc_time = arg
-        else:
-            caller_args.append(arg)
-
-    # Determinar el nombre del caller
-    caller_display = ' '.join(caller_args) if caller_args else ctx.author.display_name
-    
-    # Construir la línea de información adicional
-    additional_info_parts = []
-    if gank_info:
-        additional_info_parts.append(gank_info)
-    if utc_time:
-        additional_info_parts.append(utc_time)
-    additional_info_line = " | ".join(additional_info_parts) if additional_info_parts else ""
-
-    event_id = f"{ctx.author.id}-{int(time.time())}"
-
-    # Inicializa el diccionario de inscripciones y la lista de espera
-    inscripciones_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
-    waitlist_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
-
-    # Crea la entrada en el diccionario global
-    roaming_events[event_id] = {
-        "event_id": event_id,
-        "caller_id": ctx.author.id,
-        "caller_display": caller_display,
-        "channel_id": ctx.channel.id,
-        "party": party_lower,
-        "tier_min": tier.upper(),
-        "ip_min": ip,
-        "start_time": time.time(),
-        "message": None,
-        "inscripciones": inscripciones_dict,
-        "waitlist": waitlist_dict,
-        "additional_info": additional_info_line  # Guardamos la info adicional
-    }
-
-    # Modificar create_roaming_embed para incluir la información adicional
-    def create_roaming_embed_with_info(party, event_data):
-        embed = discord.Embed(
-            title=f"🚀 ROAMING {party.upper()} (Caller: {event_data['caller_display']})",
-            description=f"**📍 Salimos de Fort Sterling Portal**\nTier: {event_data['tier_min']} | IP: {event_data['ip_min']}+",
-            color=0x00ff00 if "kiteo" in party else 0xFF0000
-        )
-
-        # Añadir línea de información adicional si existe
-        if event_data.get('additional_info'):
-            embed.description += f"\n**ℹ️ {event_data['additional_info']}**"
-
-        total_inscritos = sum(len(players) for players in event_data["inscripciones"].values())
-        embed.set_footer(text=f"📊 {total_inscritos}/{ROAMING_PARTIES[party]['max_players']} jugadores | ID: {event_data['event_id']}")
-
-        # Resto del código del embed (roles, reglas, etc.)
-        lineas_roles = []
-        for rol, limite in ROAMING_PARTIES[party]["roles"].items():
-            inscritos = event_data["inscripciones"].get(rol, [])
-            waitlist_players = event_data["waitlist"].get(rol, [])
-            emoji = ROAMING_PARTIES[party]["emojis"].get(rol, "")
-            slots = f"{len(inscritos)}/{limite}"
-            jugadores = ' '.join(f'<@{uid}>' for uid in inscritos[:3])
-            if len(inscritos) > 3:
-                jugadores += f" (+{len(inscritos)-3} más)"
-
-            linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '🚫'}"
-            if waitlist_players:
-                jugadores_espera = ' '.join(f'<@{uid}>' for uid in waitlist_players)
-                linea += f" | ⏳ Espera: {jugadores_espera}"
-
-            lineas_roles.append(linea)
-
-        for i in range(0, len(lineas_roles), 8):
-            embed.add_field(
-                name="🎮 ROLES DISPONIBLES" if i == 0 else "↳ Continuación",
-                value="\n".join(lineas_roles[i:i+8]),
-                inline=False
-            )
-
-        reglas = (
-            f"▸ Tier mínimo: **{event_data['tier_min']}**\n"
-            f"▸ IP mínima: **{event_data['ip_min']}+**\n"
-            "▸ Traer **embotelladas y comida**\n"
-            "▸ **Escuchar calls** y no flamear\n"
-            f"▸ {'🔔 @everyone' if total_inscritos < 15 else '🚨 SOBRECUPO!'}"
-        )
-
-        embed.add_field(name="📜 REGLAS DEL ROAMING", value=reglas, inline=False)
-        return embed
-
-    # Crea el embed con la nueva función
-    embed = create_roaming_embed_with_info(party_lower, roaming_events[event_id])
-
-    # Usa la clase de vista con los botones
-    vista_botones = RoamingEventView(
-        party=party_lower,
-        event_id=event_id,
-        caller_id=ctx.author.id,
-        event_data=roaming_events[event_id]
-    )
-
-    # Envía el mensaje
-    mensaje_mencion = f"**¡Roaming de {party_lower.upper()} ha sido lanzado por {ctx.author.mention}!** "
-    mensaje = await ctx.send(content=mensaje_mencion, embed=embed, view=vista_botones)
-
-    # Guarda el objeto del mensaje para poder editarlo después
-    roaming_events[event_id]["message"] = mensaje
-
-    # Crear el hilo de discusión
+    # --- 1. Sincronizar comandos slash ---
     try:
-        thread = await mensaje.create_thread(name=f"💬 Discusión sobre Roaming {party_lower.upper()}")
-        print(f"Hilo creado con éxito: {thread.name}")
+        # Sincroniza los comandos de la aplicación con Discord
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} command(s)")
     except Exception as e:
-        print(f"Error al crear hilo: {e}")
+        print(f"Failed to sync commands: {e}")
+
+    # --- 2. Reanudar vistas persistentes ---
+    try:
+        # Re-añade las vistas para cualquier evento activo
+        for event_id, event_data in roaming_events.items():
+            if event_data.get("message"):
+                # Obtenemos el canal y el mensaje por sus IDs
+                channel = bot.get_channel(event_data["channel_id"])
+                if channel:
+                    try:
+                        message = await channel.fetch_message(event_data["message"].id)
+                        # Creamos y añadimos la vista de nuevo para que sea persistente
+                        view = RoamingEventView(
+                            party=event_data["party"],
+                            event_id=event_id,
+                            caller_id=event_data["caller_id"],
+                            event_data=event_data
+                        )
+                        bot.add_view(view, message_id=message.id)
+                        print(f"Re-added view for event {event_id}")
+                    except discord.NotFound:
+                        print(f"Message for event {event_id} not found. Skipping.")
+                else:
+                    print(f"Channel for event {event_id} not found. Skipping.")
+
+    except Exception as e:
+        print(f"Failed to re-add views: {e}")
 
     # --- 3. Iniciar tareas en bucle ---
     # Es crucial iniciar las tareas *dentro* de on_ready, donde el event loop ya está corriendo.
