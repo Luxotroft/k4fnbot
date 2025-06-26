@@ -24,6 +24,86 @@ class PiCog(commands.Cog):
             'vortex': '🌪️' # Icono para Vortex
         }
 
+    @commands.hybrid_command(name="ayuda", description="Muestra información sobre todos los comandos del bot")
+    async def ayuda(self, ctx: commands.Context):
+        """Muestra una guía completa de todos los comandos disponibles"""
+        embed = discord.Embed(
+            title="📚 Ayuda Completa - Comandos del Bot",
+            description="Aquí tienes una guía completa de todos los comandos disponibles:",
+            color=discord.Color.blue()
+        )
+        
+        # Sección de comandos de P.I.
+        embed.add_field(
+            name="⏰ Comandos de Ping de interés (P.I.)",
+            value=(
+                "**`/pi` o `!pi`** - Crea un temporizador para objetivos de P.I.\n"
+                "```/pi <tipo> <minutos> <ubicación>```\n"
+                "**Ejemplos:**\n"
+                "• `/pi orbe dorado 15 Caerleon`\n"
+                "• `/pi mineral 30 Martlock 7.4`\n"
+                "• `/pi vortex azul 20 Bridgewatch`\n\n"
+                "**Tipos disponibles:**\n"
+                "• Orbes: `verde`, `azul`, `morado`, `dorado`\n"
+                "• Recursos: `mineral`, `madera`, `piel`, `fibra`\n"
+                "• Eventos: `vortex`"
+            ),
+            inline=False
+        )
+        
+        # Sección de World Boss
+        embed.add_field(
+            name="🌍 Comandos de World Boss (`/wb`)",
+            value=(
+                "**`/wb`** - Crea un evento de World Boss con sistema de prioridad\n"
+                "```/wb <caller> <boss> <duración> [prios] [tiempo_prios] [miembros_prio]```\n"
+                "**Ejemplos:**\n"
+                "• `/wb Pancho elder \"2 horas\"`\n"
+                "• `/wb Maria eye \"90 minutos\" 5 30 @Jugador1 @Jugador2`\n\n"
+                "**Parámetros opcionales:**\n"
+                "• `prios`: Número de slots prioritarios (1-20)\n"
+                "• `tiempo_prios`: Duración de prioridad en minutos (1-60)\n"
+                "• `miembros_prio`: Menciona a los usuarios con prioridad"
+            ),
+            inline=False
+        )
+        
+        # Sección de Roaming
+        embed.add_field(
+            name="🚀 Comandos de Roaming (`!roaming` o `!r`)",
+            value=(
+                "**`!roaming` o `!r`** - Crea un evento de roaming party\n"
+                "```!roaming <tipo> <tier> <ip> [hora] [swap] [caller]```\n"
+                "**Ejemplos:**\n"
+                "• `!roaming kiteo1 T8 1400`\n"
+                "• `!r kiteo2 T8 1450 3.30 si Pancho`\n"
+                "• `!roaming brawl T8 1500 no Maria`\n\n"
+                "**Parámetros opcionales:**\n"
+                "• `hora`: Hora de salida (ej: 3.30)\n"
+                "• `swap`: 'si' o 'no' para swap de gank\n"
+                "• `caller`: Nombre del caller (si no se especifica, usa tu nombre)"
+            ),
+            inline=False
+        )
+        
+        # Sección de cierre de eventos
+        embed.add_field(
+            name="🚫 Comando para cerrar eventos (`/close`)",
+            value=(
+                "**`/close`** - Cierra un evento que hayas creado\n"
+                "```/close [event_id]```\n"
+                "**Ejemplos:**\n"
+                "• `/close` (cierra el evento más reciente que creaste)\n"
+                "• `/close WB-123456789` (cierra un evento específico por ID)\n\n"
+                "**Nota:** El ID del evento aparece en el pie del mensaje del evento"
+            ),
+            inline=False
+        )
+        
+        embed.set_footer(text="Para más ayuda, contacta a los administradores.")
+        
+        await ctx.send(embed=embed)
+
     @commands.hybrid_command(name="pi", description="Crea una cuenta regresiva para un objetivo de P.I.")
     async def pi(self, ctx: commands.Context, tipo: str, tiempo: int, ubicacion: str):
         await ctx.defer()
