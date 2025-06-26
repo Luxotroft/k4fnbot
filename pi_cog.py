@@ -111,18 +111,18 @@ class PiCog(commands.Cog):
         Ej: !pi vortex azul 20 Fort Sterling
         """
         # Expresión regular para encontrar el tipo, el tiempo y la ubicación.
-        # Captura cualquier cosa al inicio (tipo), un número (minutos) y cualquier cosa al final (ubicación).
+        # Captura cualquier texto para el tipo, luego el número, y el resto para la ubicación.
         match = re.search(r'(.+)\s+(\d+)\s+(.+)', args)
         
         if not match:
-            # Si el patrón principal no coincide, intenta un patrón más simple (sin ubicación).
-            match = re.search(r'(.+)\s+(\d+)', args)
-            if not match:
+            # Si el patrón de tres partes falla, intenta con dos partes (tipo y tiempo).
+            match_simple = re.search(r'(.+)\s+(\d+)', args)
+            if not match_simple:
                 await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
                 return
             
-            tipo = match.group(1).strip().lower()
-            tiempo = int(match.group(2))
+            tipo = match_simple.group(1).strip().lower()
+            tiempo = int(match_simple.group(2))
             ubicacion = "Ubicación desconocida" # Valor por defecto
         
         else:
