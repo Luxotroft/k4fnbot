@@ -323,6 +323,10 @@ class BuildsCog(commands.Cog):
         Ejemplo: !build santi, !build brawl, !build kiteo
         """
         build_name_clean = build_name.lower().strip()
+        
+        # --- PASO DE DEPURACIÓN: MIRA QUÉ RECIBE EL COMANDO ---
+        print(f"DEBUG: Comando !build recibido. build_name_clean: '{build_name_clean}'")
+        # ----------------------------------------------------
 
         # Condición especial para el comando !build brawl
         if build_name_clean == 'brawl':
