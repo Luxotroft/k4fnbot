@@ -100,14 +100,10 @@ class PiCog(commands.Cog):
 
         try:
             emoji = self.pi_emojis.get(tipo.lower(), '⏱️')
-            embed = discord.Embed(
-                title=f"{emoji} {tipo.title()}",
-                description=f"**📍 Ubicación:** {ubicacion}\n**⏳ Tiempo restante:** **{tiempo} minutos**",
-                color=0xFFA500
-            )
-            embed.set_footer(text="Actualización automática cada minuto")
+            tipo_formateado = tipo.upper()
+            mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo}m restantes*"
 
-            msg = await ctx.send(embed=embed)
+            msg = await ctx.send(mensaje)
 
             self.pi_countdown_data[msg.id] = {
                 'end_time': time.time() + (tiempo * 60),
@@ -138,17 +134,16 @@ class PiCog(commands.Cog):
 
                 msg = await channel.fetch_message(timer['message_id'])
                 remaining = max(0, int((timer['end_time'] - current_time) / 60))
+                emoji = self.pi_emojis.get(timer['tipo'].lower(), '⏱️')
+                tipo_formateado = timer['tipo'].upper()
 
                 if remaining <= 0:
-                    embed = msg.embeds[0]
-                    embed.description = f"**📍 Ubicación:** {timer['ubicacion']}\n**🔄 Estado:** **¡Timer completado!**"
-                    embed.color = 0x00FF00
-                    await msg.edit(embed=embed)
+                    mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ✅ *¡Ya pasó el timer!*"
+                    await msg.edit(content=mensaje)
                     expired.append(msg_id)
                 else:
-                    embed = msg.embeds[0]
-                    embed.description = f"**📍 Ubicación:** {timer['ubicacion']}\n**⏳ Tiempo restante:** **{remaining} minutos**"
-                    await msg.edit(embed=embed)
+                    mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ⏳ *{remaining}m restantes*"
+                    await msg.edit(content=mensaje)
 
             except discord.NotFound:
                 expired.append(msg_id)
@@ -168,4 +163,5 @@ class PiCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(PiCog(bot))
+
 
