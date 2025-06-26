@@ -161,8 +161,8 @@ ROAMING_PARTIES = {
             "Putrefacto": 1,
             "Tallada": 1,
             "Astral": 1,
-            "Patas de oso": 1,  # 3 slots para Patas de oso
-            "Hoja infinita": 3,
+            "Patas de oso": 3,  # 3 slots para Patas de oso
+            "Hoja infinita": 1,
             "Colmillo": 1,
             "Guadaña": 1,
             "Puas": 1
@@ -409,11 +409,19 @@ class WB_RoleSelectorView(discord.ui.View):
         # 4. Deshabilitar todos los componentes de la vista
         for item in self.children:
             item.disabled = True
+        
+        # 5. CERRAR EL HILO ASOCIADO (NUEVA LÓGICA)
+        if interaction.message.thread:
+            try:
+                await interaction.message.thread.edit(locked=True, archived=True)
+                print(f"Hilo del evento WB {self.event_id} cerrado correctamente.")
+            except Exception as e:
+                print(f"Error al cerrar el hilo del evento WB {self.event_id}: {e}")
 
-        # 5. Eliminar el evento del diccionario global
+        # 6. Eliminar el evento del diccionario global
         del wb_events[self.event_id]
 
-        # 6. Editar el mensaje con el embed actualizado y la vista deshabilitada
+        # 7. Editar el mensaje con el embed actualizado y la vista deshabilitada
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"✅ Evento de World Boss cerrado correctamente.", ephemeral=True)
 
@@ -425,7 +433,7 @@ class WB_RoleDropdown(discord.ui.Select):
             discord.SelectOption(
                 label=role,
                 emoji=WB_BOSS_DATA[boss]["emojis"].get(role),
-                description=f"0/{WB_BOSS_DATA[boss]['roles'][role]}"
+                description=f"0/{WB_BOSS_DATA[boss]["roles"][role]}"
             ) for role in WB_BOSS_DATA[boss]["roles"]
         ]
         super().__init__(
@@ -781,11 +789,19 @@ class RoamingEventView(discord.ui.View):
         for item in self.children:
             item.disabled = True
 
-        # 3. Eliminar el evento del diccionario global
+        # 3. CERRAR EL HILO ASOCIADO (NUEVA LÓGICA)
+        if interaction.message.thread:
+            try:
+                await interaction.message.thread.edit(locked=True, archived=True)
+                print(f"Hilo del evento Roaming {self.event_id} cerrado correctamente.")
+            except Exception as e:
+                print(f"Error al cerrar el hilo del evento Roaming {self.event_id}: {e}")
+        
+        # 4. Eliminar el evento del diccionario global
         if self.event_id in roaming_events:
             del roaming_events[self.event_id]
 
-        # 4. Actualizar el mensaje
+        # 5. Actualizar el mensaje
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"✅ Evento de roaming `{self.event_id}` cerrado correctamente.", ephemeral=True)
 
@@ -803,77 +819,72 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
     """
     user_id = interaction.user.id
     event_found = False
+    message_to_edit = None
+    event_data = None
+    event_type = None
 
     # --- Intentar cerrar un evento de World Boss ---
-    for eid, data in list(wb_events.items()): # Usamos list() para poder borrar elementos mientras iteramos
+    for eid, data in list(wb_events.items()):
         if data["caller_id"] == user_id and (event_id is None or eid == event_id):
             event_found = True
-
-            # Editar el mensaje original para mostrar que ha sido cerrado
-            channel = bot.get_channel(data["channel_id"])
-            if channel and data["message"]:
-                try:
-                    message_to_edit = await channel.fetch_message(data["message"].id)
-                    embed = message_to_edit.embeds[0]
-                    embed.title = f"🚫 WORLD BOSS: {data['boss'].upper()} (CERRADO)"
-                    embed.description = "**Este evento ha sido cerrado por el caller.**"
-                    embed.color = discord.Color.red()
-
-                    # Deshabilitar todos los botones y menús de la vista
-                    view = discord.ui.View()
-                    for item in message_to_edit.components:
-                        view.add_item(item)
-                    for item in view.children:
-                        item.disabled = True
-
-                    await message_to_edit.edit(embed=embed, view=view)
-
-                except discord.NotFound:
-                    print(f"Mensaje para el evento WB {eid} no encontrado. No se puede editar.")
-                except Exception as e:
-                    print(f"Error al editar el mensaje del evento WB {eid}: {e}")
-
-            # Eliminar el evento del diccionario global
+            event_data = data
+            event_type = "WB"
+            if data["message"]:
+                channel = bot.get_channel(data["channel_id"])
+                if channel:
+                    try:
+                        message_to_edit = await channel.fetch_message(data["message"].id)
+                    except discord.NotFound:
+                        print(f"Mensaje para el evento WB {eid} no encontrado.")
             del wb_events[eid]
-            if event_id: break # Si se especificó un ID, cerramos uno y salimos del bucle
+            if event_id: break
 
     # --- Intentar cerrar un evento de Roaming si no se encontró uno de WB ---
     if not event_found:
         for eid, data in list(roaming_events.items()):
             if data["caller_id"] == user_id and (event_id is None or eid == event_id):
                 event_found = True
-
-                # Editar el mensaje original
-                channel = bot.get_channel(data["channel_id"])
-                if channel and data["message"]:
-                    try:
-                        message_to_edit = await channel.fetch_message(data["message"].id)
-                        embed = message_to_edit.embeds[0]
-                        embed.title = f"🚫 ROAMING {data['party'].upper()} (CERRADO)"
-                        embed.description = "**Este evento ha sido cerrado por el caller.**"
-                        embed.color = discord.Color.red()
-
-                        # Deshabilitar todos los componentes de la vista
-                        view = discord.ui.View()
-                        for item in message_to_edit.components:
-                            view.add_item(item)
-                        for item in view.children:
-                            item.disabled = True
-
-                        await message_to_edit.edit(embed=embed, view=view)
-
-                    except discord.NotFound:
-                        print(f"Mensaje para el evento Roaming {eid} no encontrado. No se puede editar.")
-                    except Exception as e:
-                        print(f"Error al editar el mensaje del evento Roaming {eid}: {e}")
-
-                # Eliminar el evento del diccionario global
+                event_data = data
+                event_type = "Roaming"
+                if data["message"]:
+                    channel = bot.get_channel(data["channel_id"])
+                    if channel:
+                        try:
+                            message_to_edit = await channel.fetch_message(data["message"].id)
+                        except discord.NotFound:
+                            print(f"Mensaje para el evento Roaming {eid} no encontrado.")
                 del roaming_events[eid]
                 if event_id: break
+    
+    # --- PROCESAR LA LÓGICA DE CIERRE DEL MENSAJE Y EL HILO ---
+    if message_to_edit and event_found and event_data:
+        try:
+            embed = message_to_edit.embeds[0]
+            embed.title = f"🚫 {event_type.upper()}: {event_data['boss'].upper() if event_type == 'WB' else event_data['party'].upper()} (CERRADO)"
+            embed.description = "**Este evento ha sido cerrado por el caller.**"
+            embed.color = discord.Color.red()
 
-    # --- Enviar respuesta al usuario ---
-    if event_found:
-        await interaction.response.send_message(f"✅ Evento(s) cerrado(s) correctamente.", ephemeral=True)
+            # Deshabilitar todos los componentes de la vista
+            view = discord.ui.View()
+            for item in message_to_edit.components:
+                view.add_item(item)
+            for item in view.children:
+                item.disabled = True
+            
+            # CERRAR EL HILO ASOCIADO (NUEVA LÓGICA)
+            if message_to_edit.thread:
+                await message_to_edit.thread.edit(locked=True, archived=True)
+                print(f"Hilo del evento {event_id} cerrado por /close.")
+
+            await message_to_edit.edit(embed=embed, view=view)
+            await interaction.response.send_message(f"✅ Evento(s) cerrado(s) correctamente.", ephemeral=True)
+
+        except Exception as e:
+            print(f"Error al editar el mensaje o cerrar el hilo del evento {event_id}: {e}")
+            await interaction.response.send_message("❌ Ocurrió un error al cerrar el evento.", ephemeral=True)
+    elif event_found:
+        # Evento encontrado y eliminado de la memoria, pero el mensaje no pudo ser localizado
+        await interaction.response.send_message(f"✅ Evento(s) cerrado(s) correctamente (el mensaje original no pudo ser editado).", ephemeral=True)
     else:
         await interaction.response.send_message("❌ No se encontró ningún evento activo que hayas creado.", ephemeral=True)
 
@@ -915,10 +926,13 @@ async def wb_slash(
     if miembros_prio:
         for mention in miembros_prio.split():
             try:
-                user_id = int(mention.replace('<@', '').replace('!', '').replace('>', ''))
-                user = interaction.guild.get_member(user_id) 
-                if user:
-                    mentioned_users.append(user)
+                # Usa una expresión regular para encontrar IDs de usuario
+                match = re.search(r'<@!?(\d+)>', mention)
+                if match:
+                    user_id = int(match.group(1))
+                    user = interaction.guild.get_member(user_id) 
+                    if user:
+                        mentioned_users.append(user)
             except ValueError:
                 pass
 
@@ -1017,7 +1031,7 @@ async def wb_slash(
         thread = await message.create_thread(name=f"💬 Discusión sobre WB {WB_BOSS_DATA[boss_lower]['name']}")
         print(f"Hilo creado con éxito: {thread.name}")
     except discord.Forbidden:
-        print("ERROR: No se pudo crear el hilo. A pesar de los permisos de Administrador, algo está impidiendo la creación. Revisa los permisos del canal.")
+        print("ERROR: No se pudo crear el hilo. Asegúrate de que el bot tenga el permiso 'Manage Threads'.")
     except Exception as e:
         print(f"Ocurrió un error inesperado al crear el hilo: {e}")
 
@@ -1083,7 +1097,7 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
         thread = await mensaje.create_thread(name=f"💬 Discusión sobre Roaming {party_lower.upper()}")
         print(f"Hilo creado con éxito: {thread.name}")
     except discord.Forbidden:
-        print("ERROR: No se pudo crear el hilo. A pesar de los permisos de Administrador, algo está impidiendo la creación. Revisa los permisos del canal.")
+        print("ERROR: No se pudo crear el hilo. Asegúrate de que el bot tenga el permiso 'Manage Threads'.")
     except Exception as e:
         print(f"Ocurrió un error inesperado al crear el hilo: {e}")
 
