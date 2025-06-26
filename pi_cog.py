@@ -135,29 +135,53 @@ class PiCog(commands.Cog):
     # --- 3. TAREA EN BUCLE PARA ACTUALIZAR TEMPORIZADORES ---
     @tasks.loop(seconds=5)
     async def update_pi_timers(self):
+        """
+        Esta tarea en bucle actualiza cada 5 segundos los mensajes de los eventos de PI
+        y elimina los que han expirado, enviando una alerta de finalización.
+        """
+        print("Tarea en bucle update_pi_timers se está ejecutando...") # <-- Nuevo print para verificar
         events_to_remove = []
         for event_id, event_data in list(self.pi_events.items()):
             remaining_seconds = event_data['end_time'] - time.time()
             
+            # Nuevo print para ver el tiempo restante calculado
+            print(f"  > Evento {event_id}: Tiempo restante = {remaining_seconds:.2f}s") 
+            
+            # Obtener el objeto Message
             try:
                 channel = self.bot.get_channel(event_data['channel_id'])
+                if not channel:
+                    print(f"  > Canal para el evento {event_id} no encontrado. Eliminando evento.")
+                    events_to_remove.append(event_id)
+                    continue
+                
                 message = await channel.fetch_message(event_data['message_id'])
+                
+                # Actualizar el embed con el tiempo restante
+                embed = create_pi_embed(event_data)
+                await message.edit(embed=embed)
+                
+                # Comprobar si el temporizador ha llegado a 0
+                if remaining_seconds <= 0:
+                    events_to_remove.append(event_id)
+                    
+                    # Enviar alerta de finalización
+                    node_info = PI_NODES_DATA.get(event_data['type'], {"name": "Desconocido"})
+                    await channel.send(f"🚨 **¡ATENCIÓN!** El **{node_info['name']}** en **{event_data['map_name']}** ha expirado.", delete_after=300)
+                    
+                    # Borrar el mensaje del temporizador (opcional)
+                    await message.delete()
+
             except (discord.NotFound, discord.Forbidden):
-                print(f"Message for PI event {event_id} not found or inaccessible. Removing event.")
+                print(f"  > Mensaje para el evento {event_id} no encontrado o inaccesible. Eliminando evento.")
                 events_to_remove.append(event_id)
                 continue
-                
-            embed = create_pi_embed(event_data)
-            await message.edit(embed=embed)
-            
-            if remaining_seconds <= 0:
-                events_to_remove.append(event_id)
-                
-                node_info = PI_NODES_DATA.get(event_data['type'], {"name": "Desconocido"})
-                await channel.send(f"🚨 **¡ATENCIÓN!** El **{node_info['name']}** en **{event_data['map_name']}** ha expirado.", delete_after=300)
-                
-                await message.delete()
+            except Exception as e:
+                # Captura cualquier otro error inesperado y lo imprime
+                print(f"  > ¡Error inesperado en el evento {event_id}! Detalle: {e}")
+                events_to_remove.append(event_id) # Opcional: Quitar el evento con error
 
+        # Eliminar eventos expirados del diccionario
         for event_id in events_to_remove:
             if event_id in self.pi_events:
                 del self.pi_events[event_id]
