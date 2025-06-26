@@ -1,11 +1,11 @@
 import discord
 import time
+import re
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta
 import asyncio
 import os
 import random
-import re
 from discord.ui import Button, View, Select
 from dotenv import load_dotenv
 from keep_alive import keep_alive
@@ -117,7 +117,7 @@ ROAMING_PARTIES = {
         "max_players": 20,
         "roles": {
             "GOLEM": 1, "MARTILLO": 1, "GA": 1, "LOCUS": 1, "JURADORES": 1, "ENRAIZADO": 1,
-            "CANCION": 1, "CARAM": 1, "DAMNATION": 1, "LIFECURSED": 1, "PUTREFACTO": 1,
+            "CANCION": 1, "CARAMBANOS": 1, "DAMNATION": 1, "LIFECURSED": 1, "PUTREFACTO": 1,
             "OCULTO": 1, "FISURANTE": 3, "FORJACORTEZA": 1, "SANTI": 3, "TORRE_MOVIL": 1,
         },
         "emojis": {
@@ -160,8 +160,8 @@ ROAMING_PARTIES = {
             "Putrefacto": 1,
             "Tallada": 1,
             "Astral": 1,
-            "Patas de oso": 1,
-            "Hoja infinita": 3,
+            "Patas de oso": 3,
+            "Hoja infinita": 1,
             "Colmillo": 1,
             "Guadaña": 1,
             "Puas": 1
@@ -218,15 +218,15 @@ ROAMING_EVENT_TIMEOUT = 7200 # 2 horas en segundos
 # --- Helper de Roaming ---
 def get_roaming_caller_info(ctx, args):
     """
-    Determina el nombre del caller a mostrar en el embed.
-    Si el último argumento no es un número (IP/Tier) o si no hay args,
-    asume que el caller es el usuario que ejecutó el comando.
-    Si el último argumento es una palabra, lo usa como nombre del caller.
+    Determina el nombre del caller a mostrar en el embed de forma flexible.
+    Asume que el último argumento de *args es el nombre del caller.
     """
-    if not args or args[-1].upper().startswith(('T', 'IP')) or args[-1].isdigit():
-        return ctx.author.display_name # Asume que el caller es el que envía el comando
-    else:
-        return args[-1] # Usa el nombre que fue proporcionado
+    if args:
+        # Si el último argumento no es un número ni 'si'/'no', lo considera el caller.
+        last_arg = args[-1].lower()
+        if not last_arg.isdigit() and last_arg not in ('si', 'sí', 'no', 'n', 'y', 'yes'):
+            return args[-1]
+    return ctx.author.display_name # Asume que el caller es el que envía el comando
 
 def create_roaming_embed(party, event_data):
     """Genera el mensaje embed para el evento de roaming."""
@@ -241,10 +241,10 @@ def create_roaming_embed(party, event_data):
 
     # Agrega la hora si está presente
     if event_data.get("time"):
-        # CAMBIO: Agregamos 'UTC' al final de la hora si no lo tiene.
+        # Agregamos 'UTC' al final de la hora si no lo tiene.
         display_time = event_data["time"]
         if not display_time.upper().endswith('UTC'):
-            display_time += 'UTC'
+            display_time += ' UTC'
         embed.add_field(name="⏰ Hora de Salida", value=display_time, inline=True)
     
     # Agrega la información de swap de gank
@@ -288,7 +288,6 @@ def create_roaming_embed(party, event_data):
     embed.add_field(name="📜 REGLAS DEL ROAMING", value=reglas, inline=False)
     return embed
 
-# --- Helper de World Boss ---
 async def update_wb_embed(event_id):
     if event_id not in wb_events:
         return
@@ -1054,7 +1053,6 @@ async def wb_slash(
     embed_description = description_content
     footer_text = ""
     embed_color = 0x8B0000
-    view_disabled = False
 
     if has_priority:
         priority_expiry_time = time.time() + (tiempo_prios * 60)
@@ -1076,6 +1074,7 @@ async def wb_slash(
     else:
         footer_text = "🔓 Todos pueden anotarse"
         embed_color = 0x00FF00
+        view_disabled = False
 
     embed = discord.Embed(
         title=f"🌍 WORLD BOSS: {WB_BOSS_DATA[boss_lower]['name']} (Caller: {caller})",
@@ -1127,19 +1126,54 @@ async def wb_slash(
 @bot.command(name='roaming', aliases=['r'])
 async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
     """
-    Crea un evento de roaming con la opción de asignar un caller.
-    Ej: !r kiteo1 8 1400 (caller es el que envía el comando)
-    Ej: !r kiteo1 8 1400 Pepito (caller es Pepito)
+    Crea un evento de roaming con hora, swap de gank y caller opcionales.
+    Ej: !r kiteo1 T8 1400 3.30 si Pepito
+    Ej: !r kiteo1 T8 1400 no
+    Ej: !r brawl2 T8 1450 IsaelOC
     """
-    # NO es necesario deferir en comandos de prefijo a menos que la lógica interna sea muy lenta.
-    # El bot responde inmediatamente al comando de prefijo.
-    
     party_lower = party.lower()
     if party_lower not in ROAMING_PARTIES:
         return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
 
-    # Determina el nombre del caller a mostrar en el embed usando la nueva lógica
-    caller_display = get_roaming_caller_info(ctx, args)
+    # --- LÓGICA DE PARSEO FLEXIBLE DE ARGUMENTOS ---
+    # Inicializamos los valores opcionales
+    time_str = None
+    swap_gank_status = False
+    caller_display = ctx.author.display_name
+    
+    # Procesamos los argumentos adicionales (*args)
+    # Creamos una lista temporal para manipular los argumentos
+    temp_args = list(args)
+
+    # 1. Buscar el flag de swap de gank ('si'/'no') de forma flexible
+    swap_keywords_si = ('si', 'sí', 'yes', 'y')
+    swap_keywords_no = ('no', 'n')
+    
+    found_swap_arg = False
+    for i, arg in enumerate(temp_args):
+        if arg.lower() in swap_keywords_si:
+            swap_gank_status = True
+            temp_args.pop(i)
+            found_swap_arg = True
+            break
+        elif arg.lower() in swap_keywords_no:
+            swap_gank_status = False # El valor por defecto, pero lo dejamos explícito
+            temp_args.pop(i)
+            found_swap_arg = True
+            break
+
+    # 2. Buscar el argumento de la hora (que parece un número flotante, ej: '3.30')
+    found_time_arg = False
+    for i, arg in enumerate(temp_args):
+        # Usamos regex para verificar si es un número flotante como '3.30'
+        if re.match(r'^\d+(\.\d+)?$', arg):
+            time_str = temp_args.pop(i)
+            found_time_arg = True
+            break
+            
+    # 3. Lo que queda es el nombre del caller (o nada)
+    if temp_args:
+        caller_display = ' '.join(temp_args) # Unimos el resto como el nombre del caller
 
     event_id = f"{ctx.author.id}-{int(time.time())}"
 
@@ -1150,16 +1184,18 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
     # Crea la entrada en el diccionario global
     roaming_events[event_id] = {
         "event_id": event_id,
-        "caller_id": ctx.author.id,  # Este ID siempre será el del usuario que lanzó el comando (para permisos)
-        "caller_display": caller_display, # Este es el nombre a mostrar en el embed
+        "caller_id": ctx.author.id,
+        "caller_display": caller_display,
         "channel_id": ctx.channel.id,
         "party": party_lower,
         "tier_min": tier.upper(),
         "ip_min": ip,
+        "time": time_str,  # <-- NUEVO CAMPO AÑADIDO
+        "swap_gank": swap_gank_status,  # <-- CAMPO ACTUALIZADO
         "start_time": time.time(),
         "message": None,
         "inscripciones": inscripciones_dict,
-        "waitlist": waitlist_dict # Campo necesario para la lista de espera
+        "waitlist": waitlist_dict
     }
 
     # Crea el embed y la vista con el menú desplegable y los botones
@@ -1180,7 +1216,6 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
     # Guarda el objeto del mensaje para poder editarlo después
     roaming_events[event_id]["message"] = mensaje
 
-    # --- DIAGNÓSTICO: Verificamos si llegamos a esta parte del código y si el mensaje es válido ---
     print("\n--- Intentando crear el hilo para !roaming...")
     print(f"Objeto del mensaje: {mensaje}")
 
@@ -1267,35 +1302,30 @@ async def cleanup_roaming_events():
         event_data = roaming_events.get(event_id)
         if event_data:
             print(f"Cleaning up roaming event {event_id} due to timeout.")
-            # MODIFICACIÓN: Borra el mensaje expirado en lugar de editarlo
+            
+            # MODIFICACIÓN CLAVE: Borrar el mensaje y el hilo.
             message = event_data.get("message")
             if message:
                 try:
+                    # Intenta borrar el hilo asociado
+                    thread = message.thread
+                    if thread:
+                        if thread.archived:
+                            await thread.edit(archived=False, reason="Desarchivando para eliminar por expiración")
+                        await thread.delete()
+                        print(f"Hilo del evento expirado {event_id} eliminado.")
+                    
                     # Intenta borrar el mensaje
                     await message.delete()
                     print(f"Mensaje del evento expirado {event_id} eliminado.")
                 except discord.NotFound:
-                    print(f"Mensaje del evento expirado {event_id} ya no existe.")
+                    print(f"Mensaje o hilo del evento expirado {event_id} ya no existe.")
                 except discord.Forbidden:
-                    print(f"Fallo al eliminar el mensaje del evento expirado {event_id}. Permisos faltantes.")
+                    print(f"Fallo al eliminar el mensaje/hilo del evento expirado {event_id}. Permisos faltantes.")
                 except Exception as e:
                     print(f"Error inesperado al eliminar el mensaje del evento expirado {event_id}: {e}")
             
-            # Borra el hilo asociado si existe
-            thread = message.thread if message else None
-            if thread:
-                try:
-                    if thread.archived:
-                        await thread.edit(archived=False, reason="Desarchivando para eliminar por expiración")
-                    await thread.delete()
-                    print(f"Hilo del evento expirado {event_id} eliminado.")
-                except discord.NotFound:
-                    print(f"El hilo del evento expirado {event_id} ya no existe.")
-                except discord.Forbidden:
-                    print(f"Fallo al eliminar el hilo del evento expirado {event_id}. Permisos faltantes.")
-                except Exception as e:
-                    print(f"Error inesperado al eliminar el hilo del evento expirado {event_id}: {e}")
-
+            # Eliminar de la memoria del bot
             del roaming_events[event_id]
 
 # La función before_loop se mantiene igual, ya que es la forma correcta de esperar.
@@ -1304,7 +1334,7 @@ async def before_cleanup_roaming():
     await bot.wait_until_ready()
 
 # ====================================================================
-# --- 8. EJECUCIÓN DEL BOT ---\
+# --- 8. EJECUCIÓN DEL BOT ---
 # ====================================================================
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
