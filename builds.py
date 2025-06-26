@@ -319,12 +319,38 @@ class BuildsCog(commands.Cog):
     @commands.command(name='build')
     async def build_command(self, ctx, *, build_name: str):
         """
-        Muestra la información de una build específica para sus diferentes composiciones.
-        Ejemplo: !build santi
+        Muestra la información de una build específica o una imagen para composiciones.
+        Ejemplo: !build santi, !build brawl, !build kiteo
         """
         build_name_clean = build_name.lower().strip()
+
+        # Condición especial para el comando !build brawl
+        if build_name_clean == 'brawl':
+            embed = discord.Embed(
+                title="🛡️ Builds para Composición **BRAWL**",
+                color=discord.Color.red()
+            )
+            # URL de la imagen que quieres mostrar para brawl
+            image_url = "https://media.discordapp.net/attachments/1387864307378819202/1387864321404567602/image.png?ex=685ee4df&is=685d935f&hm=884cf944b954c7925e98f3ffc41d20d316eb6ddc9e10ce2a50f96392a6ae05df&=&format=webp&quality=lossless&width=864&height=442" # CAMBIA ESTE LINK POR LA IMAGEN DE BRAWL
+            embed.set_image(url=image_url)
+            embed.set_footer(text="Fuente: Composiciones de Gremio")
+            await ctx.send(embed=embed)
+            return  # Termina la ejecución para no continuar con la búsqueda en el diccionario
         
-        # Busca la build principal en el diccionario
+        # Condición especial para el comando !build kiteo
+        if build_name_clean == 'kiteo':
+            embed = discord.Embed(
+                title="🌬️ Builds para Composición **KITEO**",
+                color=discord.Color.blue()
+            )
+            # URL de la imagen que quieres mostrar para kiteo
+            image_url = "https://cdn.discordapp.com/attachments/1387864307378819202/1387864874427744386/image.png?ex=685ee563&is=685d93e3&hm=1041c35cd7a17235f7fd9accf45f1c31ec2f07f96eafae92544e5b896a3cde35&" # CAMBIA ESTE LINK POR LA IMAGEN DE KITEO
+            embed.set_image(url=image_url)
+            embed.set_footer(text="Fuente: Composiciones de Gremio")
+            await ctx.send(embed=embed)
+            return # Termina la ejecución
+
+        # Busca la build principal en el diccionario si no es una de las excepciones
         build_options = self.build_data.get(build_name_clean)
         
         if build_options:
