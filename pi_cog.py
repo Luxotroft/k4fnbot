@@ -12,7 +12,7 @@ class PiCog(commands.Cog):
             'verde': '🟢', 'azul': '🔵', 'morado': '🟣', 'dorado': '🟡',
             'mineral': '⛏️', 'madera': '🌳', 'piel': '🐾', 'fibra': '🌿',
             'vortex': '🌪️', 'vortex azul': '🌪️🔵', 'vortex verde': '🌪️🟢',
-            'vortex dorado': '🌪️🟡', 'vortex morado': '🌪️🟣'
+            'vortex dorado': '🌪️🟡', 'vortex morado': '🌪️🟣',  # <--- ¡Añade esta coma!
             'orbe verde': '🟢',
             'orbe azul': '🔵',
             'orbe morado': '🟣',
