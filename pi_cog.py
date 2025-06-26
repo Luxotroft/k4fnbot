@@ -13,6 +13,10 @@ class PiCog(commands.Cog):
             'mineral': '⛏️', 'madera': '🌳', 'piel': '🐾', 'fibra': '🌿',
             'vortex': '🌪️', 'vortex azul': '🌪️🔵', 'vortex verde': '🌪️🟢',
             'vortex dorado': '🌪️🟡', 'vortex morado': '🌪️🟣'
+            'orbe verde': '🟢',
+            'orbe azul': '🔵',
+            'orbe morado': '🟣',
+            'orbe dorado': '🟡'
         }
         print("✅ Módulo P.I. cargado (comandos !pi y !ayuda)")
 
