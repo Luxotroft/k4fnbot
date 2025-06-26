@@ -75,35 +75,30 @@ class PiCog(commands.Cog):
     @commands.command(name='pi')
     async def pi_command(self, ctx, *, args: str):
         """Crea un temporizador P.I. (ej: !pi vortex azul 20 Fort Sterling)"""
+        parts = args.split()
+        tiempo = None
+        tiempo_index = -1
+
+        for i, part in enumerate(parts):
+            if part.isdigit():
+                tiempo = int(part)
+                tiempo_index = i
+                break
+
+        if tiempo is None:
+            return await ctx.send("**❌ El tiempo debe ser un número entero**\nEjemplo: `!pi mineral 30 Martlock`")
+        if tiempo <= 0:
+            return await ctx.send("**❌ El tiempo debe ser mayor a cero**")
+        if tiempo > 1440:
+            return await ctx.send("**❌ El tiempo máximo es 1440 minutos (24 horas)**")
+
+        tipo = ' '.join(parts[:tiempo_index])
+        ubicacion = ' '.join(parts[tiempo_index + 1:])
+
+        if not tipo or not ubicacion:
+            return await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
+
         try:
-            parts = args.split()
-            tiempo = None
-            tiempo_index = -1
-
-            for i, part in enumerate(parts):
-                if part.isdigit():
-                    tiempo = int(part)
-                    tiempo_index = i
-                    break
-
-            if tiempo is None:
-                await ctx.send("**❌ El tiempo debe ser un número entero**\nEjemplo: `!pi mineral 30 Martlock`")
-                return
-
-            if tiempo <= 0:
-                await ctx.send("**❌ El tiempo debe ser mayor a cero**")
-                return
-            if tiempo > 1440:
-                await ctx.send("**❌ El tiempo máximo es 1440 minutos (24 horas)**")
-                return
-
-            tipo = ' '.join(parts[:tiempo_index])
-            ubicacion = ' '.join(parts[tiempo_index + 1:])
-
-            if not tipo or not ubicacion:
-                await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
-                return
-
             emoji = self.pi_emojis.get(tipo.lower(), '⏱️')
             embed = discord.Embed(
                 title=f"{emoji} {tipo.title()}",
