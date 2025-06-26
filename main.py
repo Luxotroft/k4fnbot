@@ -1096,46 +1096,142 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
 # --- 6. EVENTOS DEL BOT ---
 # ====================================================================
 
-@bot.event
-async def on_ready():
-    """Se ejecuta cuando el bot está listo y conectado a Discord."""
-    print(f'Logged in as {bot.user.name} ({bot.user.id})')
-    print('------')
+@bot.command(name='roaming', aliases=['r'])
+async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
+    """
+    Crea un evento de roaming con la opción de asignar un caller.
+    Ej: !r kiteo1 8 1400 (caller es el que envía el comando)
+    Ej: !r kiteo1 8 1400 Pepito (caller es Pepito)
+    Ej: !r brawl2 T8 1450 IsaelOC Gank 3.30 UTC
+    """
+    party_lower = party.lower()
+    if party_lower not in ROAMING_PARTIES:
+        return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
 
-    # --- 1. Sincronizar comandos slash ---
+    # Procesar los argumentos adicionales
+    additional_info = []
+    gank_info = ""
+    utc_time = ""
+    caller_args = []
+    
+    # Separar los argumentos del caller y la información adicional
+    for arg in args:
+        arg_lower = arg.lower()
+        if arg_lower == "gank":
+            gank_info = "Swap de gankeo"
+        elif "utc" in arg_lower:
+            utc_time = arg
+        else:
+            caller_args.append(arg)
+
+    # Determinar el nombre del caller
+    caller_display = ' '.join(caller_args) if caller_args else ctx.author.display_name
+    
+    # Construir la línea de información adicional
+    additional_info_parts = []
+    if gank_info:
+        additional_info_parts.append(gank_info)
+    if utc_time:
+        additional_info_parts.append(utc_time)
+    additional_info_line = " | ".join(additional_info_parts) if additional_info_parts else ""
+
+    event_id = f"{ctx.author.id}-{int(time.time())}"
+
+    # Inicializa el diccionario de inscripciones y la lista de espera
+    inscripciones_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
+    waitlist_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
+
+    # Crea la entrada en el diccionario global
+    roaming_events[event_id] = {
+        "event_id": event_id,
+        "caller_id": ctx.author.id,
+        "caller_display": caller_display,
+        "channel_id": ctx.channel.id,
+        "party": party_lower,
+        "tier_min": tier.upper(),
+        "ip_min": ip,
+        "start_time": time.time(),
+        "message": None,
+        "inscripciones": inscripciones_dict,
+        "waitlist": waitlist_dict,
+        "additional_info": additional_info_line  # Guardamos la info adicional
+    }
+
+    # Modificar create_roaming_embed para incluir la información adicional
+    def create_roaming_embed_with_info(party, event_data):
+        embed = discord.Embed(
+            title=f"🚀 ROAMING {party.upper()} (Caller: {event_data['caller_display']})",
+            description=f"**📍 Salimos de Fort Sterling Portal**\nTier: {event_data['tier_min']} | IP: {event_data['ip_min']}+",
+            color=0x00ff00 if "kiteo" in party else 0xFF0000
+        )
+
+        # Añadir línea de información adicional si existe
+        if event_data.get('additional_info'):
+            embed.description += f"\n**ℹ️ {event_data['additional_info']}**"
+
+        total_inscritos = sum(len(players) for players in event_data["inscripciones"].values())
+        embed.set_footer(text=f"📊 {total_inscritos}/{ROAMING_PARTIES[party]['max_players']} jugadores | ID: {event_data['event_id']}")
+
+        # Resto del código del embed (roles, reglas, etc.)
+        lineas_roles = []
+        for rol, limite in ROAMING_PARTIES[party]["roles"].items():
+            inscritos = event_data["inscripciones"].get(rol, [])
+            waitlist_players = event_data["waitlist"].get(rol, [])
+            emoji = ROAMING_PARTIES[party]["emojis"].get(rol, "")
+            slots = f"{len(inscritos)}/{limite}"
+            jugadores = ' '.join(f'<@{uid}>' for uid in inscritos[:3])
+            if len(inscritos) > 3:
+                jugadores += f" (+{len(inscritos)-3} más)"
+
+            linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '🚫'}"
+            if waitlist_players:
+                jugadores_espera = ' '.join(f'<@{uid}>' for uid in waitlist_players)
+                linea += f" | ⏳ Espera: {jugadores_espera}"
+
+            lineas_roles.append(linea)
+
+        for i in range(0, len(lineas_roles), 8):
+            embed.add_field(
+                name="🎮 ROLES DISPONIBLES" if i == 0 else "↳ Continuación",
+                value="\n".join(lineas_roles[i:i+8]),
+                inline=False
+            )
+
+        reglas = (
+            f"▸ Tier mínimo: **{event_data['tier_min']}**\n"
+            f"▸ IP mínima: **{event_data['ip_min']}+**\n"
+            "▸ Traer **embotelladas y comida**\n"
+            "▸ **Escuchar calls** y no flamear\n"
+            f"▸ {'🔔 @everyone' if total_inscritos < 15 else '🚨 SOBRECUPO!'}"
+        )
+
+        embed.add_field(name="📜 REGLAS DEL ROAMING", value=reglas, inline=False)
+        return embed
+
+    # Crea el embed con la nueva función
+    embed = create_roaming_embed_with_info(party_lower, roaming_events[event_id])
+
+    # Usa la clase de vista con los botones
+    vista_botones = RoamingEventView(
+        party=party_lower,
+        event_id=event_id,
+        caller_id=ctx.author.id,
+        event_data=roaming_events[event_id]
+    )
+
+    # Envía el mensaje
+    mensaje_mencion = f"**¡Roaming de {party_lower.upper()} ha sido lanzado por {ctx.author.mention}!** "
+    mensaje = await ctx.send(content=mensaje_mencion, embed=embed, view=vista_botones)
+
+    # Guarda el objeto del mensaje para poder editarlo después
+    roaming_events[event_id]["message"] = mensaje
+
+    # Crear el hilo de discusión
     try:
-        # Sincroniza los comandos de la aplicación con Discord
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
+        thread = await mensaje.create_thread(name=f"💬 Discusión sobre Roaming {party_lower.upper()}")
+        print(f"Hilo creado con éxito: {thread.name}")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
-
-    # --- 2. Reanudar vistas persistentes ---
-    try:
-        # Re-añade las vistas para cualquier evento activo
-        for event_id, event_data in roaming_events.items():
-            if event_data.get("message"):
-                # Obtenemos el canal y el mensaje por sus IDs
-                channel = bot.get_channel(event_data["channel_id"])
-                if channel:
-                    try:
-                        message = await channel.fetch_message(event_data["message"].id)
-                        # Creamos y añadimos la vista de nuevo para que sea persistente
-                        view = RoamingEventView(
-                            party=event_data["party"],
-                            event_id=event_id,
-                            caller_id=event_data["caller_id"],
-                            event_data=event_data
-                        )
-                        bot.add_view(view, message_id=message.id)
-                        print(f"Re-added view for event {event_id}")
-                    except discord.NotFound:
-                        print(f"Message for event {event_id} not found. Skipping.")
-                else:
-                    print(f"Channel for event {event_id} not found. Skipping.")
-
-    except Exception as e:
-        print(f"Failed to re-add views: {e}")
+        print(f"Error al crear hilo: {e}")
 
     # --- 3. Iniciar tareas en bucle ---
     # Es crucial iniciar las tareas *dentro* de on_ready, donde el event loop ya está corriendo.
