@@ -100,7 +100,7 @@ class PiCog(commands.Cog):
                     message = await channel.fetch_message(data['message_id'])
                     
                     final_embed = message.embeds[0]
-                    final_embed.description = f"**Ubicación:** {data['location']}\n**Aparece en:** **¡HA APARECIDO!**"
+                    final_embed.description = f"**Ubicación:** {data['location']}\n**Aparece en:** **¡Ya pasó el timer!**"
                     final_embed.color = discord.Color.green()
                     final_embed.set_footer(text="El conteo ha finalizado.")
                     await message.edit(embed=final_embed)
