@@ -67,8 +67,8 @@ class PiCog(commands.Cog):
                 "```!pi <tipo> <tiempo> <ubicación>```\n"
                 "**Ejemplos:**\n"
                 "• `!pi vortex azul 20 Fort Sterling` (20 minutos)\n"
-                "• `!pi vortex azul 1h30 Fort Sterling` (1 hora 30 min)\n"
-                "• `!pi mineral 2h \"Thetford Portal\"` (2 horas)\n\n"
+                "• `!pi mineral 7.4 1h30 Fort Sterling` (tier 7.4, 1h30)\n"
+                "• `!pi vortex azul 2h \"Thetford Portal\"` (2 horas)\n\n"
                 "**Formatos de tiempo:**\n"
                 "• `30` o `30m` = 30 minutos\n"
                 "• `1h` = 1 hora\n"
@@ -123,13 +123,23 @@ class PiCog(commands.Cog):
         tiempo_minutos = None
         tiempo_index = -1
 
-        # Buscar el tiempo en los argumentos
+        # Buscar el tiempo en los argumentos - priorizar formatos con h/m
         for i, part in enumerate(parts):
-            tiempo_parsed = self.parse_time(part)
-            if tiempo_parsed is not None:
-                tiempo_minutos = tiempo_parsed
-                tiempo_index = i
-                break
+            # Primero buscar formatos con 'h' o 'm'
+            if 'h' in part.lower() or 'm' in part.lower():
+                tiempo_parsed = self.parse_time(part)
+                if tiempo_parsed is not None:
+                    tiempo_minutos = tiempo_parsed
+                    tiempo_index = i
+                    break
+        
+        # Si no encontró formato h/m, buscar números simples
+        if tiempo_minutos is None:
+            for i, part in enumerate(parts):
+                if part.isdigit():
+                    tiempo_minutos = int(part)
+                    tiempo_index = i
+                    break
 
         if tiempo_minutos is None:
             return await ctx.send("**❌ Formato de tiempo inválido**\nEjemplos: `30`, `1h`, `1h30`, `2h15`\nUso: `!pi <tipo> <tiempo> <ubicación>`")
@@ -140,15 +150,18 @@ class PiCog(commands.Cog):
         if tiempo_minutos > 1440:  # 24 horas
             return await ctx.send("**❌ El tiempo máximo es 24 horas**")
 
-        tipo = ' '.join(parts[:tiempo_index])
+        tipo_completo = ' '.join(parts[:tiempo_index])
         ubicacion = ' '.join(parts[tiempo_index + 1:])
 
-        if not tipo or not ubicacion:
-            return await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <tiempo> <ubicación>`\nEjemplo: `!pi vortex azul 1h30 Fort Sterling`")
+        if not tipo_completo or not ubicacion:
+            return await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> [tier] <tiempo> <ubicación>`\nEjemplo: `!pi mineral 7.4 1h30 Fort Sterling`")
 
         try:
-            emoji = self.pi_emojis.get(tipo.lower(), '⏱️')
-            tipo_formateado = tipo.upper()
+            # Extraer el tipo base para el emoji (primera palabra)
+            tipo_base = parts[0].lower()
+            emoji = self.pi_emojis.get(tipo_base, '⏱️')
+            
+            tipo_formateado = tipo_completo.upper()
             tiempo_formateado = self.format_time_remaining(tiempo_minutos)
             
             mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo_formateado} restantes*"
@@ -160,7 +173,8 @@ class PiCog(commands.Cog):
                 'channel_id': ctx.channel.id,
                 'message_id': msg.id,
                 'ubicacion': ubicacion,
-                'tipo': tipo
+                'tipo_completo': tipo_completo,
+                'tipo_base': tipo_base
             }
 
             if not self.update_timers.is_running():
@@ -186,8 +200,8 @@ class PiCog(commands.Cog):
                 remaining_seconds = max(0, timer['end_time'] - current_time)
                 remaining_minutes = int(remaining_seconds / 60)
                 
-                emoji = self.pi_emojis.get(timer['tipo'].lower(), '⏱️')
-                tipo_formateado = timer['tipo'].upper()
+                emoji = self.pi_emojis.get(timer['tipo_base'], '⏱️')
+                tipo_formateado = timer['tipo_completo'].upper()
 
                 if remaining_minutes <= 0:
                     mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ✅ *¡Ya pasó el timer!*"
