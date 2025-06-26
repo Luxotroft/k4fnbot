@@ -158,8 +158,8 @@ ROAMING_PARTIES = {
             "Putrefacto": 1,
             "Tallada": 1,
             "Astral": 1,
-            "Patas de oso": 3,  # 3 slots para Patas de oso
-            "Hoja infinita": 1,
+            "Patas de oso": 1,  # 3 slots para Patas de oso
+            "Hoja infinita": 3,
             "Colmillo": 1,
             "Guadaña": 1,
             "Puas": 1
