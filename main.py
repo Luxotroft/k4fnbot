@@ -5,10 +5,9 @@ from datetime import datetime, timedelta
 import asyncio
 import os
 import random
+import re
 from discord.ui import Button, View, Select
 from dotenv import load_dotenv
-import os
-import re # Se importa el módulo re para la extracción de IDs de usuario
 from keep_alive import keep_alive
 
 load_dotenv()
@@ -153,7 +152,7 @@ ROAMING_PARTIES = {
             "Maza pesada": 1,
             "Martillo de una mano": 1,
             "Baston de equilibrio": 1,
-            "Santificador": 3,  # 3 slots para Santificador
+            "Santificador": 3,
             "Infortunio": 1,
             "Juradores": 1,
             "Silvano": 1,
@@ -161,7 +160,7 @@ ROAMING_PARTIES = {
             "Putrefacto": 1,
             "Tallada": 1,
             "Astral": 1,
-            "Patas de oso": 3,  # 3 slots para Patas de oso
+            "Patas de oso": 3,
             "Hoja infinita": 1,
             "Colmillo": 1,
             "Guadaña": 1,
@@ -180,7 +179,7 @@ ROAMING_PARTIES = {
             "Tallada": "<:Tallada:1290881286092886172>",
             "Astral": "<:Astral:1334556937328525413>",
             "Patas de oso": "<:PatasDeOso:1272599457778630737>",
-            "Hoja infinita": "⚔️",  # Emoji genérico de espada
+            "Hoja infinita": "⚔️",
             "Colmillo": "<:Colmillo:1370577697516032031>",
             "Guadaña": "<:Guadaa:1291468660917014538>",
             "Puas": "<:Puas:1291468593506029638>"
@@ -208,11 +207,6 @@ ROAMING_PARTIES = {
     }
 }
 
-wb_events = {} # {event_id: {data}}
-wb_priority_users = {} # {event_id: {"users": [], "expiry": timestamp, "slots": int}}
-WB_EVENT_TIMEOUT = 7200 # 2 horas
-
-# --- Datos para Roaming Parties ---
 roaming_events = {} # {event_id: {data}}
 roaming_generic_counter = 0
 ROAMING_EVENT_TIMEOUT = 7200 # 2 horas en segundos
@@ -379,7 +373,6 @@ async def update_wb_embed(event_id):
 
 # --- Clases para World Boss (WB) ---
 class WB_RoleSelectorView(discord.ui.View):
-    # --- MODIFICACIÓN: Se añade 'caller_id' para el botón de cerrar ---
     def __init__(self, boss, event_id, caller_id, disabled=False):
         super().__init__(timeout=None)
         self.caller_id = caller_id
@@ -388,7 +381,6 @@ class WB_RoleSelectorView(discord.ui.View):
         self.add_item(WB_LeaveButton(event_id))
         self.add_item(WB_JoinWaitlistMainButton(boss, event_id))
 
-    # --- NUEVO: Botón para cerrar el evento ---
     @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", row=1)
     async def close_event_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # 1. Verificar si el usuario que presiona el botón es el caller original
@@ -399,29 +391,42 @@ class WB_RoleSelectorView(discord.ui.View):
         if self.event_id not in wb_events:
             return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
 
-        # 3. Actualizar el embed para mostrar que el evento está cerrado
+        # 3. Obtener el hilo asociado
+        thread = interaction.message.thread
+        
+        # 4. **MODIFICACIÓN CLAVE: Cerrar el hilo de forma segura**
+        if thread:
+            try:
+                # Paso 1: Desarchivar el hilo si está archivado. Esto es necesario para editarlo.
+                if thread.archived:
+                    await thread.edit(archived=False)
+                    print(f"Hilo desarchivado temporalmente para el evento WB {self.event_id}.")
+                
+                # Paso 2: Bloquear y archivar el hilo.
+                await thread.edit(locked=True, archived=True, reason="Evento cerrado por el caller.")
+                print(f"Hilo del evento WB {self.event_id} bloqueado y archivado correctamente.")
+            except discord.Forbidden:
+                print(f"Error: El bot no tiene el permiso 'Manage Threads' en el canal para el evento WB {self.event_id}.")
+            except Exception as e:
+                print(f"Error inesperado al cerrar el hilo del evento WB {self.event_id}: {e}")
+        else:
+            print("No se encontró un hilo asociado al mensaje del evento WB.")
+
+        # 5. Actualizar el embed para mostrar que el evento está cerrado
         event_data = wb_events[self.event_id]
         embed = interaction.message.embeds[0]
         embed.title = f"🚫 WORLD BOSS: {event_data['boss'].upper()} (CERRADO)"
         embed.description = f"**Este evento ha sido cerrado por el caller: {interaction.user.display_name}**"
         embed.color = discord.Color.red()
 
-        # 4. Deshabilitar todos los componentes de la vista
+        # 6. Deshabilitar todos los componentes de la vista
         for item in self.children:
             item.disabled = True
         
-        # 5. CERRAR EL HILO ASOCIADO (NUEVA LÓGICA)
-        if interaction.message.thread:
-            try:
-                await interaction.message.thread.edit(locked=True, archived=True)
-                print(f"Hilo del evento WB {self.event_id} cerrado correctamente.")
-            except Exception as e:
-                print(f"Error al cerrar el hilo del evento WB {self.event_id}: {e}")
-
-        # 6. Eliminar el evento del diccionario global
+        # 7. Eliminar el evento del diccionario global
         del wb_events[self.event_id]
 
-        # 7. Editar el mensaje con el embed actualizado y la vista deshabilitada
+        # 8. Editar el mensaje con el embed actualizado y la vista deshabilitada
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"✅ Evento de World Boss cerrado correctamente.", ephemeral=True)
 
@@ -444,8 +449,11 @@ class WB_RoleDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        # MODIFICACIÓN: Defer la respuesta para evitar el timeout
+        await interaction.response.defer(ephemeral=True)
+
         if self.event_id not in wb_events:
-            return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
+            return await interaction.followup.send("❌ Este evento ya no está activo.", ephemeral=True)
 
         event = wb_events[self.event_id]
         role = self.values[0]
@@ -453,13 +461,13 @@ class WB_RoleDropdown(discord.ui.Select):
         # Check if user is already in any role or waitlist for this event
         for existing_role, users in event["inscriptions"].items():
             if interaction.user.id in users:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Ya estás inscrito como **{existing_role}**. Usa el botón 'Salir de Rol' primero.",
                     ephemeral=True
                 )
         for existing_role, users in event["waitlist"].items():
             if interaction.user.id in users:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Ya estás en la lista de espera para **{existing_role}**. Usa el botón 'Salir de Rol' primero.",
                     ephemeral=True
                 )
@@ -472,7 +480,7 @@ class WB_RoleDropdown(discord.ui.Select):
             if (priority_data and time.time() < priority_data["expiry"] and 
                 interaction.user.id not in priority_data["users"] and not is_caller):
                 expiry_time = priority_data["expiry"] if priority_data else 0
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"🔒 **Solo usuarios prioritarios pueden anotarse ahora.**\n"
                     f"⏳ El bloqueo termina: <t:{int(expiry_time)}:R>",
                     ephemeral=True
@@ -484,11 +492,11 @@ class WB_RoleDropdown(discord.ui.Select):
 
         # Check if role is full for main inscription
         if len(event["inscriptions"][role]) >= WB_BOSS_DATA[self.boss]["roles"][role]:
-            return await interaction.response.send_message("❌ Este rol ya está lleno. Usa el botón 'Unirse a Lista de Espera' si deseas esperar un slot.", ephemeral=True)
+            return await interaction.followup.send("❌ Este rol ya está lleno. Usa el botón 'Unirse a Lista de Espera' si deseas esperar un slot.", ephemeral=True)
 
         # Inscribe user
         event["inscriptions"][role].append(interaction.user.id)
-        await interaction.response.send_message(f"✅ Te has unido como **{role}**", ephemeral=True)
+        await interaction.followup.send(f"✅ Te has unido como **{role}**", ephemeral=True)
         await update_wb_embed(self.event_id)
 
 class WB_LeaveButton(discord.ui.Button):
@@ -497,8 +505,11 @@ class WB_LeaveButton(discord.ui.Button):
         self.event_id = event_id
 
     async def callback(self, interaction: discord.Interaction):
+        # MODIFICACIÓN: Defer la respuesta
+        await interaction.response.defer(ephemeral=True)
+
         if self.event_id not in wb_events:
-            return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
+            return await interaction.followup.send("❌ Este evento ya no está activo.", ephemeral=True)
 
         event = wb_events[self.event_id]
         user_removed = False
@@ -534,10 +545,10 @@ class WB_LeaveButton(discord.ui.Button):
                         except discord.Forbidden:
                             print(f"No se pudo enviar DM a {promoted_member.name}. Probablemente tiene los DMs cerrados.")
 
-            await interaction.response.send_message("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
+            await interaction.followup.send("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
             await update_wb_embed(self.event_id)
         else:
-            await interaction.response.send_message("❌ No estás inscrito en ningún rol ni en lista de espera en este evento.", ephemeral=True)
+            await interaction.followup.send("❌ No estás inscrito en ningún rol ni en lista de espera en este evento.", ephemeral=True)
 
 class WB_JoinWaitlistMainButton(discord.ui.Button):
     def __init__(self, boss, event_id):
@@ -546,21 +557,24 @@ class WB_JoinWaitlistMainButton(discord.ui.Button):
         self.event_id = event_id
 
     async def callback(self, interaction: discord.Interaction):
+        # MODIFICACIÓN: Defer la respuesta
+        await interaction.response.defer(ephemeral=True)
+
         if self.event_id not in wb_events:
-            return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
+            return await interaction.followup.send("❌ Este evento ya no está activo.", ephemeral=True)
 
         event = wb_events[self.event_id]
 
         # Check if user is already in any role or waitlist for this event
         for existing_role, users in event["inscriptions"].items():
             if interaction.user.id in users:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Ya estás inscrito como **{existing_role}**. No puedes unirte a la lista de espera.",
                     ephemeral=True
                 )
         for existing_role, users in event["waitlist"].items():
             if interaction.user.id in users:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Ya estás en la lista de espera para **{existing_role}**. No puedes unirte a otra.",
                     ephemeral=True
                 )
@@ -572,12 +586,12 @@ class WB_JoinWaitlistMainButton(discord.ui.Button):
         ]
 
         if not full_roles:
-            return await interaction.response.send_message("✅ ¡No hay roles llenos en este momento! Puedes unirte directamente usando el menú desplegable de roles.", ephemeral=True)
+            return await interaction.followup.send("✅ ¡No hay roles llenos en este momento! Puedes unirte directamente usando el menú desplegable de roles.", ephemeral=True)
 
         # Present a new dropdown for selecting the waitlist role
         view = discord.ui.View(timeout=60)
         view.add_item(WB_WaitlistRoleDropdown(self.boss, self.event_id, full_roles))
-        await interaction.response.send_message("Por favor, selecciona el rol al que deseas unirte en la lista de espera:", view=view, ephemeral=True)
+        await interaction.followup.send("Por favor, selecciona el rol al que deseas unirte en la lista de espera:", view=view, ephemeral=True)
 
 class WB_WaitlistRoleDropdown(discord.ui.Select):
     def __init__(self, boss, event_id, full_roles):
@@ -597,8 +611,11 @@ class WB_WaitlistRoleDropdown(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
+        # MODIFICACIÓN: Defer la respuesta
+        await interaction.response.defer(ephemeral=True)
+
         if self.event_id not in wb_events:
-            return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
+            return await interaction.followup.send("❌ Este evento ya no está activo.", ephemeral=True)
 
         event = wb_events[self.event_id]
         role = self.values[0]
@@ -607,26 +624,26 @@ class WB_WaitlistRoleDropdown(discord.ui.Select):
         partial_user_id = interaction.user.id
         for existing_role, users in event["inscriptions"].items():
             if partial_user_id in users:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Ya estás inscrito como **{existing_role}**. No puedes unirte a la lista de espera.",
                     ephemeral=True
                 )
         for existing_role, users in event["waitlist"].items():
             if partial_user_id in users:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Ya estás en la lista de espera para **{existing_role}**. No puedes unirte a otra.",
                     ephemeral=True
                 )
 
         # Re-check if role is still full
         if len(event["inscriptions"][role]) < WB_BOSS_DATA[self.boss]["roles"][role]:
-            await interaction.response.send_message(f"✅ ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
+            await interaction.followup.send(f"✅ ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
             await update_wb_embed(self.event_id) # Update embed to reflect open slot
             return
 
         # Add to waitlist
         event["waitlist"][role].append(partial_user_id)
-        await interaction.response.send_message(f"✅ Te has unido a la lista de espera para **{role}**.", ephemeral=True)
+        await interaction.followup.send(f"✅ Te has unido a la lista de espera para **{role}**.", ephemeral=True)
         await update_wb_embed(self.event_id)
 
 # --- Clases para Roaming Parties ---
@@ -658,6 +675,9 @@ class RoamingEventView(discord.ui.View):
         )
 
         async def callback(interaction: discord.Interaction):
+            # MODIFICACIÓN: Defer la respuesta
+            await interaction.response.defer()
+
             user_id = interaction.user.id
             rol_elegido = select_menu.values[0]
 
@@ -671,7 +691,7 @@ class RoamingEventView(discord.ui.View):
 
             # Verificar slot disponible
             if len(self.event_data["inscripciones"][rol_elegido]) >= ROAMING_PARTIES[self.party]["roles"][rol_elegido]:
-                await interaction.response.send_message("❌ Este rol ya está lleno. Por favor, usa el botón 'Lista de Espera'.", ephemeral=True)
+                await interaction.followup.send("❌ Este rol ya está lleno. Por favor, usa el botón 'Lista de Espera'.", ephemeral=True)
                 return
 
             # Inscribir al jugador
@@ -680,7 +700,7 @@ class RoamingEventView(discord.ui.View):
             # Actualizar embed
             embed = create_roaming_embed(self.party, self.event_data)
             await self.event_data["message"].edit(embed=embed, view=RoamingEventView(self.party, self.event_id, self.caller_id, self.event_data))
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"✅ Te has unido como **{rol_elegido}** en el evento de {self.event_data['caller_display']}",
                 ephemeral=True
             )
@@ -691,6 +711,9 @@ class RoamingEventView(discord.ui.View):
     # --- Botón para SALIR de rol ---
     @discord.ui.button(label="Salir de Rol", style=discord.ButtonStyle.red, emoji="🏃")
     async def leave_role_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # MODIFICACIÓN: Defer la respuesta
+        await interaction.response.defer(ephemeral=True)
+
         user_id = interaction.user.id
         user_removed = False
 
@@ -712,30 +735,33 @@ class RoamingEventView(discord.ui.View):
         if user_removed:
             embed = create_roaming_embed(self.party, self.event_data)
             await self.event_data["message"].edit(embed=embed)
-            await interaction.response.send_message("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
+            await interaction.followup.send("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ No estás inscrito en ningún rol ni en lista de espera en este evento.", ephemeral=True)
+            await interaction.followup.send("❌ No estás inscrito en ningún rol ni en lista de espera en este evento.", ephemeral=True)
 
     # --- Botón para UNIRSE a la lista de espera ---
     @discord.ui.button(label="Lista de Espera", style=discord.ButtonStyle.secondary, emoji="👥")
     async def join_waitlist_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # MODIFICACIÓN: Defer la respuesta
+        await interaction.response.defer(ephemeral=True)
+        
         user_id = interaction.user.id
 
         # Remover de cualquier rol previo en ESTE evento
         for rol in self.event_data["inscripciones"]:
             if user_id in self.event_data["inscripciones"][rol]:
-                await interaction.response.send_message("❌ Ya estás en un rol principal. Usa 'Salir de Rol' para moverte a la lista de espera.", ephemeral=True)
+                await interaction.followup.send("❌ Ya estás en un rol principal. Usa 'Salir de Rol' para moverte a la lista de espera.", ephemeral=True)
                 return
         for rol in self.event_data["waitlist"]:
             if user_id in self.event_data["waitlist"][rol]:
-                await interaction.response.send_message("❌ Ya estás en la lista de espera para un rol. Usa 'Salir de Rol' para cambiar.", ephemeral=True)
+                await interaction.followup.send("❌ Ya estás en la lista de espera para un rol. Usa 'Salir de Rol' para cambiar.", ephemeral=True)
                 return
 
         # Crear un select para que elija el rol en la lista de espera
         full_roles = [rol for rol, limite in ROAMING_PARTIES[self.party]["roles"].items() if len(self.event_data["inscripciones"][rol]) >= limite]
 
         if not full_roles:
-            return await interaction.response.send_message("✅ ¡No hay roles llenos en este momento! Usa el menú desplegable principal para unirte.", ephemeral=True)
+            return await interaction.followup.send("✅ ¡No hay roles llenos en este momento! Usa el menú desplegable principal para unirte.", ephemeral=True)
 
         options = [
             discord.SelectOption(
@@ -753,24 +779,29 @@ class RoamingEventView(discord.ui.View):
         )
 
         async def waitlist_callback(interact: discord.Interaction):
+            # MODIFICACIÓN: Defer la respuesta para el nuevo dropdown
+            await interact.response.defer(ephemeral=True)
+
             rol_elegido = select_waitlist.values[0]
+            user_id = interact.user.id # Obtener el ID del usuario de la nueva interacción
+
             # Verifica si el rol sigue lleno (puede haber cambiado en el intertanto)
             if len(self.event_data["inscripciones"][rol_elegido]) < ROAMING_PARTIES[self.party]["roles"][rol_elegido]:
-                await interact.response.send_message(f"🎉 ¡Un slot se abrió en **{rol_elegido}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
+                await interact.followup.send(f"🎉 ¡Un slot se abrió en **{rol_elegido}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
                 return
 
             self.event_data["waitlist"][rol_elegido].append(user_id)
 
             embed = create_roaming_embed(self.party, self.event_data)
             await self.event_data["message"].edit(embed=embed)
-            await interact.response.send_message(f"✅ Te has unido a la lista de espera para **{rol_elegido}**.", ephemeral=True)
+            await interact.followup.send(f"✅ Te has unido a la lista de espera para **{rol_elegido}**.", ephemeral=True)
 
         select_waitlist.callback = waitlist_callback
 
         temp_view = discord.ui.View(timeout=60)
         temp_view.add_item(select_waitlist)
 
-        await interaction.response.send_message("Selecciona el rol para la lista de espera:", view=temp_view, ephemeral=True)
+        await interaction.followup.send("Selecciona el rol para la lista de espera:", view=temp_view, ephemeral=True)
 
     # --- Botón para CERRAR el evento (Solo el caller) ---
     @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫")
@@ -779,7 +810,28 @@ class RoamingEventView(discord.ui.View):
         if interaction.user.id != self.caller_id:
             return await interaction.response.send_message("❌ Solo el que lanzó el evento puede cerrarlo.", ephemeral=True)
 
-        # 2. Actualizar el embed para mostrar que el evento está cerrado
+        # 2. Obtener el hilo asociado
+        thread = interaction.message.thread
+
+        # 3. **MODIFICACIÓN CLAVE: Cerrar el hilo de forma segura**
+        if thread:
+            try:
+                # Paso 1: Desarchivar el hilo si está archivado.
+                if thread.archived:
+                    await thread.edit(archived=False, reason="Desarchivando para cerrar")
+                    print(f"Hilo desarchivado temporalmente para el evento Roaming {self.event_id}.")
+                
+                # Paso 2: Bloquear y archivar el hilo.
+                await thread.edit(locked=True, archived=True, reason="Evento cerrado por el caller.")
+                print(f"Hilo del evento Roaming {self.event_id} bloqueado y archivado correctamente.")
+            except discord.Forbidden:
+                print(f"Error: El bot no tiene el permiso 'Manage Threads' en el canal para el evento Roaming {self.event_id}.")
+            except Exception as e:
+                print(f"Error inesperado al cerrar el hilo del evento Roaming {self.event_id}: {e}")
+        else:
+            print("No se encontró un hilo asociado al mensaje del evento Roaming.")
+            
+        # 4. Actualizar el embed para mostrar que el evento está cerrado
         embed = interaction.message.embeds[0]
         embed.title = f"🚫 ROAMING {self.event_data['party'].upper()} (CERRADO)"
         embed.description = f"**Este evento ha sido cerrado por el caller: {interaction.user.display_name}**"
@@ -789,21 +841,14 @@ class RoamingEventView(discord.ui.View):
         for item in self.children:
             item.disabled = True
 
-        # 3. CERRAR EL HILO ASOCIADO (NUEVA LÓGICA)
-        if interaction.message.thread:
-            try:
-                await interaction.message.thread.edit(locked=True, archived=True)
-                print(f"Hilo del evento Roaming {self.event_id} cerrado correctamente.")
-            except Exception as e:
-                print(f"Error al cerrar el hilo del evento Roaming {self.event_id}: {e}")
-        
-        # 4. Eliminar el evento del diccionario global
+        # 5. Eliminar el evento del diccionario global
         if self.event_id in roaming_events:
             del roaming_events[self.event_id]
 
-        # 5. Actualizar el mensaje
+        # 6. Actualizar el mensaje
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(f"✅ Evento de roaming `{self.event_id}` cerrado correctamente.", ephemeral=True)
+
 
 # ====================================================================
 # --- 5. COMANDOS (SLASH Y PREFIX) ---
@@ -817,6 +862,7 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
     Cierra un evento de WB o Roaming.
     Si no se especifica un ID, cerrará el evento más reciente que haya creado el usuario.
     """
+    await interaction.response.defer(ephemeral=True) # MODIFICACIÓN: Defer la respuesta
     user_id = interaction.user.id
     event_found = False
     message_to_edit = None
@@ -871,22 +917,32 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
             for item in view.children:
                 item.disabled = True
             
-            # CERRAR EL HILO ASOCIADO (NUEVA LÓGICA)
-            if message_to_edit.thread:
-                await message_to_edit.thread.edit(locked=True, archived=True)
-                print(f"Hilo del evento {event_id} cerrado por /close.")
+            # **MODIFICACIÓN CLAVE: Cerrar el hilo de forma segura**
+            thread = message_to_edit.thread
+            if thread:
+                try:
+                    if thread.archived:
+                        await thread.edit(archived=False, reason="Desarchivando para cerrar")
+                    await thread.edit(locked=True, archived=True, reason="Evento cerrado por /close")
+                    print(f"Hilo del evento {event_id} cerrado por /close.")
+                except discord.Forbidden:
+                    print(f"Error: El bot no tiene el permiso 'Manage Threads' en el canal para el evento {event_id}.")
+                except Exception as e:
+                    print(f"Error inesperado al cerrar el hilo del evento {event_id}: {e}")
+            else:
+                print("No se encontró un hilo asociado al mensaje del evento.")
 
             await message_to_edit.edit(embed=embed, view=view)
-            await interaction.response.send_message(f"✅ Evento(s) cerrado(s) correctamente.", ephemeral=True)
+            await interaction.followup.send(f"✅ Evento(s) cerrado(s) correctamente.", ephemeral=True)
 
         except Exception as e:
             print(f"Error al editar el mensaje o cerrar el hilo del evento {event_id}: {e}")
-            await interaction.response.send_message("❌ Ocurrió un error al cerrar el evento.", ephemeral=True)
+            await interaction.followup.send("❌ Ocurrió un error al cerrar el evento.", ephemeral=True)
     elif event_found:
         # Evento encontrado y eliminado de la memoria, pero el mensaje no pudo ser localizado
-        await interaction.response.send_message(f"✅ Evento(s) cerrado(s) correctamente (el mensaje original no pudo ser editado).", ephemeral=True)
+        await interaction.followup.send(f"✅ Evento(s) cerrado(s) correctamente (el mensaje original no pudo ser editado).", ephemeral=True)
     else:
-        await interaction.response.send_message("❌ No se encontró ningún evento activo que hayas creado.", ephemeral=True)
+        await interaction.followup.send("❌ No se encontró ningún evento activo que hayas creado.", ephemeral=True)
 
 # --- Comando Slash para World Boss ---
 @bot.tree.command(name="wb", description="Crea un evento de World Boss con o sin prioridad.")
@@ -910,14 +966,16 @@ async def wb_slash(
     """
     Crea un evento de World Boss.
     """
+    await interaction.response.defer() # MODIFICACIÓN: Defer la respuesta para dar tiempo al bot de crear el hilo
+
     boss_lower = boss.lower()
     if boss_lower not in WB_BOSS_DATA:
-        return await interaction.response.send_message("❌ Boss inválido. Usa `elder` o `eye`.", ephemeral=True)
+        return await interaction.followup.send("❌ Boss inválido. Usa `elder` o `eye`.", ephemeral=True)
 
     # Verificar si el usuario ya tiene un evento activo
     for event_id, event_data in wb_events.items():
         if event_data["caller_id"] == interaction.user.id:
-            return await interaction.response.send_message("❌ Ya tienes un evento activo. Usa `/close` para cerrarlo primero.", ephemeral=True)
+            return await interaction.followup.send("❌ Ya tienes un evento activo. Usa `/close` para cerrarlo primero.", ephemeral=True)
 
     has_priority = (prios > 0 and tiempo_prios > 0)
 
@@ -926,7 +984,6 @@ async def wb_slash(
     if miembros_prio:
         for mention in miembros_prio.split():
             try:
-                # Usa una expresión regular para encontrar IDs de usuario
                 match = re.search(r'<@!?(\d+)>', mention)
                 if match:
                     user_id = int(match.group(1))
@@ -941,7 +998,7 @@ async def wb_slash(
             mentioned_users.insert(0, interaction.user)
 
         if len(mentioned_users) > prios:
-            return await interaction.response.send_message(f"❌ Solo puedes asignar {prios} usuarios prioritarios. Has mencionado {len(mentioned_users)} (incluyéndote).", ephemeral=True)
+            return await interaction.followup.send(f"❌ Solo puedes asignar {prios} usuarios prioritarios. Has mencionado {len(mentioned_users)} (incluyéndote).", ephemeral=True)
 
     event_id = f"WB-{int(time.time())}"
     description_content = WB_BOSS_DATA[boss_lower]["default_description"].format(duration=duracion)
@@ -1016,14 +1073,15 @@ async def wb_slash(
             inline=False
         )
 
-    # --- MODIFICACIÓN: Pasamos el caller_id a la vista ---
     view = WB_RoleSelectorView(boss_lower, event_id, interaction.user.id, disabled=view_disabled)
 
-    await interaction.response.send_message(embed=embed, view=view)
+    # MODIFICACIÓN: Enviar el mensaje usando `followup.send` después de diferir
+    await interaction.followup.send(embed=embed, view=view)
+    
+    # MODIFICACIÓN: Obtener el mensaje después de enviarlo y crear el hilo
     message = await interaction.original_response()
     event["message"] = message
 
-    # --- DIAGNÓSTICO: Verificamos si llegamos a esta parte del código y si el mensaje es válido ---
     print("\n--- Intentando crear el hilo para /wb...")
     print(f"Objeto del mensaje: {message}")
 
@@ -1043,6 +1101,9 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
     Ej: !r kiteo1 8 1400 (caller es el que envía el comando)
     Ej: !r kiteo1 8 1400 Pepito (caller es Pepito)
     """
+    # NO es necesario deferir en comandos de prefijo a menos que la lógica interna sea muy lenta.
+    # El bot responde inmediatamente al comando de prefijo.
+    
     party_lower = party.lower()
     if party_lower not in ROAMING_PARTIES:
         return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
