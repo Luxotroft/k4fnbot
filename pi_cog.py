@@ -6,7 +6,7 @@ import re
 class PiCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Inicializa pi_countdown_data si no existe
+        # Inicializa pi_countdown_data si no existe en el bot
         if not hasattr(self.bot, 'pi_countdown_data'):
             self.bot.pi_countdown_data = {}
         print("✅ Módulo P.I. cargado (solo prefijo !pi)")
@@ -20,7 +20,7 @@ class PiCog(commands.Cog):
             'orbe verde': '🟢', 'orbe azul': '🔵', 'orbe morado': '🟣', 'orbe dorado': '🟡'
         }
         
-        # Inicia el bucle de actualización si ya hay temporizadores guardados (por si el bot se reinicia)
+        # Inicia el bucle de actualización si ya hay temporizadores guardados
         if self.bot.pi_countdown_data and not self.update_timers.is_running():
             self.update_timers.start()
 
@@ -110,34 +110,28 @@ class PiCog(commands.Cog):
         Crea un temporizador de P.I. y puede manejar nombres de ciudades con espacios.
         Ej: !pi vortex azul 20 Fort Sterling
         """
-        # Expresión regular para encontrar el tiempo al final de la cadena.
-        # Captura un número de 1 o 2 dígitos antes del final.
-        match = re.search(r'(\d+)\s*(.*)', args)
+        # Expresión regular para encontrar el tipo, el tiempo y la ubicación.
+        # Captura cualquier cosa al inicio (tipo), un número (minutos) y cualquier cosa al final (ubicación).
+        match = re.search(r'(.+)\s+(\d+)\s+(.+)', args)
         
         if not match:
-            await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
-            return
+            # Si el patrón principal no coincide, intenta un patrón más simple (sin ubicación).
+            match = re.search(r'(.+)\s+(\d+)', args)
+            if not match:
+                await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
+                return
+            
+            tipo = match.group(1).strip().lower()
+            tiempo = int(match.group(2))
+            ubicacion = "Ubicación desconocida" # Valor por defecto
+        
+        else:
+            # Si el patrón completo coincide, extrae los tres grupos.
+            tipo = match.group(1).strip().lower()
+            tiempo = int(match.group(2))
+            ubicacion = match.group(3).strip()
             
         try:
-            tiempo = int(match.group(1))
-            # Todo lo que está antes del número es el tipo y la ubicación.
-            # Se necesitan al menos 2 palabras (tipo y ubicación).
-            pre_tiempo = args[:match.start(1)].strip()
-            
-            # Ahora separamos el tipo y la ubicación.
-            # Rsplit desde la derecha para separar la ubicación.
-            parts = pre_tiempo.rsplit(' ', 1)
-            
-            if len(parts) < 2:
-                # No se especificó ubicación.
-                tipo = pre_tiempo
-                ubicacion = "Ubicación desconocida"
-            else:
-                tipo, ubicacion = parts
-                
-            tipo = tipo.strip().lower()
-            ubicacion = ubicacion.strip()
-
             if tiempo <= 0:
                 await ctx.send("**❌ El tiempo debe ser mayor a 0 minutos.**")
                 return
