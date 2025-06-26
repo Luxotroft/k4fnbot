@@ -394,41 +394,51 @@ class WB_RoleSelectorView(discord.ui.View):
         # 3. Obtener el hilo asociado
         thread = interaction.message.thread
         
-        # 4. **MODIFICACIÓN CLAVE: Cerrar el hilo de forma segura**
+        # 4. MODIFICACIÓN CLAVE: Eliminar el hilo de forma segura
         if thread:
             try:
-                # Paso 1: Desarchivar el hilo si está archivado. Esto es necesario para editarlo.
+                # Paso 1: Desarchivar el hilo si está archivado.
                 if thread.archived:
-                    await thread.edit(archived=False)
-                    print(f"Hilo desarchivado temporalmente para el evento WB {self.event_id}.")
+                    await thread.edit(archived=False, reason="Desarchivando para eliminar")
                 
-                # Paso 2: Bloquear y archivar el hilo.
-                await thread.edit(locked=True, archived=True, reason="Evento cerrado por el caller.")
-                print(f"Hilo del evento WB {self.event_id} bloqueado y archivado correctamente.")
+                # Paso 2: Eliminar el hilo.
+                await thread.delete()
+                print(f"Hilo del evento WB {self.event_id} eliminado correctamente.")
+            except discord.NotFound:
+                print(f"El hilo del evento WB {self.event_id} ya no existe.")
             except discord.Forbidden:
-                print(f"Error: El bot no tiene el permiso 'Manage Threads' en el canal para el evento WB {self.event_id}.")
+                print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento WB {self.event_id}.")
             except Exception as e:
-                print(f"Error inesperado al cerrar el hilo del evento WB {self.event_id}: {e}")
+                print(f"Error inesperado al eliminar el hilo del evento WB {self.event_id}: {e}")
         else:
             print("No se encontró un hilo asociado al mensaje del evento WB.")
 
-        # 5. Actualizar el embed para mostrar que el evento está cerrado
-        event_data = wb_events[self.event_id]
-        embed = interaction.message.embeds[0]
-        embed.title = f"🚫 WORLD BOSS: {event_data['boss'].upper()} (CERRADO)"
-        embed.description = f"**Este evento ha sido cerrado por el caller: {interaction.user.display_name}**"
-        embed.color = discord.Color.red()
-
-        # 6. Deshabilitar todos los componentes de la vista
-        for item in self.children:
-            item.disabled = True
-        
-        # 7. Eliminar el evento del diccionario global
+        # 5. Eliminar el mensaje principal
+        try:
+            # Usa interaction.message.delete() para borrar el mensaje que contiene el embed y los botones.
+            await interaction.message.delete()
+            print(f"Mensaje del evento WB {self.event_id} eliminado correctamente.")
+        except discord.Forbidden:
+            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento WB {self.event_id}.")
+            # Si no puede borrar el mensaje, desactiva la vista y notifica.
+            for item in self.children:
+                item.disabled = True
+            await interaction.response.edit_message(view=self)
+            return await interaction.followup.send("✅ Evento cerrado, pero no pude borrar el mensaje (permisos faltantes).", ephemeral=True)
+        except Exception as e:
+            print(f"Error inesperado al eliminar el mensaje del evento WB {self.event_id}: {e}")
+            # Si no puede borrar el mensaje, desactiva la vista y notifica.
+            for item in self.children:
+                item.disabled = True
+            await interaction.response.edit_message(view=self)
+            return await interaction.followup.send("❌ Ocurrió un error al intentar eliminar el mensaje.", ephemeral=True)
+            
+        # 6. Eliminar el evento del diccionario global
         del wb_events[self.event_id]
 
-        # 8. Editar el mensaje con el embed actualizado y la vista deshabilitada
-        await interaction.response.edit_message(embed=embed, view=self)
-        await interaction.followup.send(f"✅ Evento de World Boss cerrado correctamente.", ephemeral=True)
+        # 7. Responde a la interacción. Como ya borraste el mensaje,
+        # solo puedes enviar una respuesta de seguimiento.
+        await interaction.response.send_message(f"✅ Evento de World Boss cerrado y eliminado.", ephemeral=True)
 
 class WB_RoleDropdown(discord.ui.Select):
     def __init__(self, boss, event_id, disabled=False):
@@ -813,41 +823,50 @@ class RoamingEventView(discord.ui.View):
         # 2. Obtener el hilo asociado
         thread = interaction.message.thread
 
-        # 3. **MODIFICACIÓN CLAVE: Cerrar el hilo de forma segura**
+        # 3. MODIFICACIÓN CLAVE: Eliminar el hilo de forma segura
         if thread:
             try:
                 # Paso 1: Desarchivar el hilo si está archivado.
                 if thread.archived:
-                    await thread.edit(archived=False, reason="Desarchivando para cerrar")
-                    print(f"Hilo desarchivado temporalmente para el evento Roaming {self.event_id}.")
+                    await thread.edit(archived=False, reason="Desarchivando para eliminar")
                 
-                # Paso 2: Bloquear y archivar el hilo.
-                await thread.edit(locked=True, archived=True, reason="Evento cerrado por el caller.")
-                print(f"Hilo del evento Roaming {self.event_id} bloqueado y archivado correctamente.")
+                # Paso 2: Eliminar el hilo.
+                await thread.delete()
+                print(f"Hilo del evento Roaming {self.event_id} eliminado correctamente.")
+            except discord.NotFound:
+                print(f"El hilo del evento Roaming {self.event_id} ya no existe.")
             except discord.Forbidden:
-                print(f"Error: El bot no tiene el permiso 'Manage Threads' en el canal para el evento Roaming {self.event_id}.")
+                print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento Roaming {self.event_id}.")
             except Exception as e:
-                print(f"Error inesperado al cerrar el hilo del evento Roaming {self.event_id}: {e}")
+                print(f"Error inesperado al eliminar el hilo del evento Roaming {self.event_id}: {e}")
         else:
             print("No se encontró un hilo asociado al mensaje del evento Roaming.")
             
-        # 4. Actualizar el embed para mostrar que el evento está cerrado
-        embed = interaction.message.embeds[0]
-        embed.title = f"🚫 ROAMING {self.event_data['party'].upper()} (CERRADO)"
-        embed.description = f"**Este evento ha sido cerrado por el caller: {interaction.user.display_name}**"
-        embed.color = discord.Color.red()
-
-        # Deshabilitar todos los componentes de la vista
-        for item in self.children:
-            item.disabled = True
-
+        # 4. Eliminar el mensaje principal
+        try:
+            await interaction.message.delete()
+            print(f"Mensaje del evento Roaming {self.event_id} eliminado correctamente.")
+        except discord.Forbidden:
+            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento Roaming {self.event_id}.")
+            # Si no puede borrar el mensaje, desactiva la vista y notifica.
+            for item in self.children:
+                item.disabled = True
+            await interaction.response.edit_message(view=self)
+            return await interaction.followup.send("✅ Evento cerrado, pero no pude borrar el mensaje (permisos faltantes).", ephemeral=True)
+        except Exception as e:
+            print(f"Error inesperado al eliminar el mensaje del evento Roaming {self.event_id}: {e}")
+            # Si no puede borrar el mensaje, desactiva la vista y notifica.
+            for item in self.children:
+                item.disabled = True
+            await interaction.response.edit_message(view=self)
+            return await interaction.followup.send("❌ Ocurrió un error al intentar eliminar el mensaje.", ephemeral=True)
+        
         # 5. Eliminar el evento del diccionario global
         if self.event_id in roaming_events:
             del roaming_events[self.event_id]
 
-        # 6. Actualizar el mensaje
-        await interaction.response.edit_message(embed=embed, view=self)
-        await interaction.followup.send(f"✅ Evento de roaming `{self.event_id}` cerrado correctamente.", ephemeral=True)
+        # 6. Responde a la interacción.
+        await interaction.response.send_message(f"✅ Evento de roaming `{self.event_id}` cerrado y eliminado.", ephemeral=True)
 
 
 # ====================================================================
@@ -862,7 +881,7 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
     Cierra un evento de WB o Roaming.
     Si no se especifica un ID, cerrará el evento más reciente que haya creado el usuario.
     """
-    await interaction.response.defer(ephemeral=True) # MODIFICACIÓN: Defer la respuesta
+    await interaction.response.defer(ephemeral=True) # MODIFICACIÓN: Defer la respuesta para dar tiempo al bot
     user_id = interaction.user.id
     event_found = False
     message_to_edit = None
@@ -875,15 +894,15 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
             event_found = True
             event_data = data
             event_type = "WB"
-            if data["message"]:
+            if data.get("message"):
                 channel = bot.get_channel(data["channel_id"])
                 if channel:
                     try:
                         message_to_edit = await channel.fetch_message(data["message"].id)
                     except discord.NotFound:
-                        print(f"Mensaje para el evento WB {eid} no encontrado.")
+                        print(f"Mensaje para el evento WB {eid} no encontrado. Se elimina de la memoria.")
             del wb_events[eid]
-            if event_id: break
+            if event_id: break # Break if a specific ID was given
 
     # --- Intentar cerrar un evento de Roaming si no se encontró uno de WB ---
     if not event_found:
@@ -892,55 +911,66 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
                 event_found = True
                 event_data = data
                 event_type = "Roaming"
-                if data["message"]:
+                if data.get("message"):
                     channel = bot.get_channel(data["channel_id"])
                     if channel:
                         try:
                             message_to_edit = await channel.fetch_message(data["message"].id)
                         except discord.NotFound:
-                            print(f"Mensaje para el evento Roaming {eid} no encontrado.")
+                            print(f"Mensaje para el evento Roaming {eid} no encontrado. Se elimina de la memoria.")
                 del roaming_events[eid]
-                if event_id: break
+                if event_id: break # Break if a specific ID was given
     
-    # --- PROCESAR LA LÓGICA DE CIERRE DEL MENSAJE Y EL HILO ---
+    # --- PROCESAR LA LÓGICA DE CIERRE Y ELIMINACIÓN ---
     if message_to_edit and event_found and event_data:
         try:
-            embed = message_to_edit.embeds[0]
-            embed.title = f"🚫 {event_type.upper()}: {event_data['boss'].upper() if event_type == 'WB' else event_data['party'].upper()} (CERRADO)"
-            embed.description = "**Este evento ha sido cerrado por el caller.**"
-            embed.color = discord.Color.red()
-
-            # Deshabilitar todos los componentes de la vista
-            view = discord.ui.View()
-            for item in message_to_edit.components:
-                view.add_item(item)
-            for item in view.children:
-                item.disabled = True
-            
-            # **MODIFICACIÓN CLAVE: Cerrar el hilo de forma segura**
+            # MODIFICACIÓN CLAVE: Eliminar el hilo y el mensaje.
             thread = message_to_edit.thread
             if thread:
                 try:
                     if thread.archived:
-                        await thread.edit(archived=False, reason="Desarchivando para cerrar")
-                    await thread.edit(locked=True, archived=True, reason="Evento cerrado por /close")
-                    print(f"Hilo del evento {event_id} cerrado por /close.")
+                        await thread.edit(archived=False, reason="Desarchivando para eliminar")
+                    await thread.delete()
+                    print(f"Hilo del evento {event_id} eliminado por /close.")
+                except discord.NotFound:
+                    print(f"El hilo del evento {event_id} ya no existe.")
                 except discord.Forbidden:
-                    print(f"Error: El bot no tiene el permiso 'Manage Threads' en el canal para el evento {event_id}.")
+                    print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento {event_id}.")
                 except Exception as e:
-                    print(f"Error inesperado al cerrar el hilo del evento {event_id}: {e}")
+                    print(f"Error inesperado al eliminar el hilo del evento {event_id}: {e}")
             else:
                 print("No se encontró un hilo asociado al mensaje del evento.")
 
+            # Eliminar el mensaje que contiene el embed.
+            await message_to_edit.delete()
+            
+            await interaction.followup.send(f"✅ Evento(s) cerrado(s) y eliminado(s) correctamente.", ephemeral=True)
+
+        except discord.Forbidden:
+            # Si no puede borrar el mensaje, edita la vista para deshabilitarla.
+            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento {event_id}.")
+            embed = message_to_edit.embeds[0]
+            embed.title = f"🚫 {event_type.upper()} (CERRADO)"
+            embed.description = "**Este evento ha sido cerrado, pero no se pudo eliminar el mensaje (permisos faltantes).**"
+            embed.color = discord.Color.red()
+            view = discord.ui.View()
+            # Intenta recrear la vista para deshabilitarla
+            if event_type == "WB":
+                view = WB_RoleSelectorView(event_data['boss'], event_id, event_data['caller_id'])
+            elif event_type == "Roaming":
+                view = RoamingEventView(event_data['party'], event_id, event_data['caller_id'], event_data)
+            
+            for item in view.children:
+                item.disabled = True
             await message_to_edit.edit(embed=embed, view=view)
-            await interaction.followup.send(f"✅ Evento(s) cerrado(s) correctamente.", ephemeral=True)
+            await interaction.followup.send("❌ El evento ha sido cerrado, pero no pude borrar el mensaje (revisa mis permisos).", ephemeral=True)
 
         except Exception as e:
-            print(f"Error al editar el mensaje o cerrar el hilo del evento {event_id}: {e}")
+            print(f"Error al eliminar el mensaje del evento {event_id}: {e}")
             await interaction.followup.send("❌ Ocurrió un error al cerrar el evento.", ephemeral=True)
     elif event_found:
         # Evento encontrado y eliminado de la memoria, pero el mensaje no pudo ser localizado
-        await interaction.followup.send(f"✅ Evento(s) cerrado(s) correctamente (el mensaje original no pudo ser editado).", ephemeral=True)
+        await interaction.followup.send(f"✅ Evento(s) cerrado(s) correctamente (el mensaje original no pudo ser localizado o eliminado).", ephemeral=True)
     else:
         await interaction.followup.send("❌ No se encontró ningún evento activo que hayas creado.", ephemeral=True)
 
@@ -1237,20 +1267,35 @@ async def cleanup_roaming_events():
         event_data = roaming_events.get(event_id)
         if event_data:
             print(f"Cleaning up roaming event {event_id} due to timeout.")
-            # Optional: Edit message to show it's expired
+            # MODIFICACIÓN: Borra el mensaje expirado en lugar de editarlo
             message = event_data.get("message")
             if message:
                 try:
-                    embed = message.embeds[0]
-                    embed.title = f"⚠️ ROAMING {event_data['party'].upper()} (EXPIRADO)"
-                    embed.description = "**Este evento ha expirado y se ha cerrado automáticamente.**"
-                    embed.color = discord.Color.dark_gray()
-                    view = RoamingEventView(event_data['party'], event_id, event_data['caller_id'], event_data)
-                    for item in view.children:
-                        item.disabled = True
-                    await message.edit(embed=embed, view=view)
+                    # Intenta borrar el mensaje
+                    await message.delete()
+                    print(f"Mensaje del evento expirado {event_id} eliminado.")
+                except discord.NotFound:
+                    print(f"Mensaje del evento expirado {event_id} ya no existe.")
+                except discord.Forbidden:
+                    print(f"Fallo al eliminar el mensaje del evento expirado {event_id}. Permisos faltantes.")
                 except Exception as e:
-                    print(f"Error editing expired roaming message: {e}")
+                    print(f"Error inesperado al eliminar el mensaje del evento expirado {event_id}: {e}")
+            
+            # Borra el hilo asociado si existe
+            thread = message.thread if message else None
+            if thread:
+                try:
+                    if thread.archived:
+                        await thread.edit(archived=False, reason="Desarchivando para eliminar por expiración")
+                    await thread.delete()
+                    print(f"Hilo del evento expirado {event_id} eliminado.")
+                except discord.NotFound:
+                    print(f"El hilo del evento expirado {event_id} ya no existe.")
+                except discord.Forbidden:
+                    print(f"Fallo al eliminar el hilo del evento expirado {event_id}. Permisos faltantes.")
+                except Exception as e:
+                    print(f"Error inesperado al eliminar el hilo del evento expirado {event_id}: {e}")
+
             del roaming_events[event_id]
 
 # La función before_loop se mantiene igual, ya que es la forma correcta de esperar.
@@ -1259,7 +1304,7 @@ async def before_cleanup_roaming():
     await bot.wait_until_ready()
 
 # ====================================================================
-# --- 8. EJECUCIÓN DEL BOT ---
+# --- 8. EJECUCIÓN DEL BOT ---\
 # ====================================================================
 keep_alive()
 bot.run(os.getenv("DISCORD_TOKEN"))
