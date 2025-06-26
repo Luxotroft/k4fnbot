@@ -1283,7 +1283,7 @@ async def on_ready():
         print("Successfully loaded pi_cog.")
     except Exception as e:
         print(f"Failed to load pi_cog: {e}")
-
+        
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
