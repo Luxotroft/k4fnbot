@@ -17,14 +17,11 @@ class PiCog(commands.Cog):
 
     @commands.command(name='ayuda')
     async def ayuda(self, ctx):
-        """Muestra TODOS los comandos del bot"""
         embed = discord.Embed(
             title="📚 **AYUDA COMPLETA**",
             description="Comandos disponibles para World Boss, Roaming y P.I.:",
             color=0x00FF00
         )
-        
-        # Sección P.I.
         embed.add_field(
             name="⏰ **COMANDOS P.I. (!pi)**",
             value=(
@@ -39,8 +36,6 @@ class PiCog(commands.Cog):
             ),
             inline=False
         )
-
-        # Sección World Boss
         embed.add_field(
             name="🌍 **WORLD BOSS (/wb)**",
             value=(
@@ -52,8 +47,6 @@ class PiCog(commands.Cog):
             ),
             inline=False
         )
-
-        # Sección Roaming
         embed.add_field(
             name="🚀 **ROAMING (!roaming o !r)**",
             value=(
@@ -65,8 +58,6 @@ class PiCog(commands.Cog):
             ),
             inline=False
         )
-
-        # Sección Cerrar Eventos
         embed.add_field(
             name="🚫 **CERRAR EVENTOS (/close)**",
             value=(
@@ -78,36 +69,39 @@ class PiCog(commands.Cog):
             ),
             inline=False
         )
-
         embed.set_footer(text="📍 Usa comillas para nombres con espacios (ej: \"Fort Sterling\")")
         await ctx.send(embed=embed)
 
-    # ... (Aquí iría el resto de tu código existente: pi_command, update_timers, etc.) ...
     @commands.command(name='pi')
     async def pi_command(self, ctx, *, args: str):
         """Crea un temporizador P.I. (ej: !pi vortex azul 20 Fort Sterling)"""
         try:
             parts = args.split()
-            
-            if len(parts) < 3:
-                await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
-                return
+            tiempo = None
+            tiempo_index = -1
 
-            try:
-                tiempo = int(parts[-2])
-            except ValueError:
+            for i, part in enumerate(parts):
+                if part.isdigit():
+                    tiempo = int(part)
+                    tiempo_index = i
+                    break
+
+            if tiempo is None:
                 await ctx.send("**❌ El tiempo debe ser un número entero**\nEjemplo: `!pi mineral 30 Martlock`")
                 return
-
-            tipo = ' '.join(parts[:-2])
-            ubicacion = ' '.join(parts[-1:])
 
             if tiempo <= 0:
                 await ctx.send("**❌ El tiempo debe ser mayor a cero**")
                 return
-                
             if tiempo > 1440:
                 await ctx.send("**❌ El tiempo máximo es 1440 minutos (24 horas)**")
+                return
+
+            tipo = ' '.join(parts[:tiempo_index])
+            ubicacion = ' '.join(parts[tiempo_index + 1:])
+
+            if not tipo or not ubicacion:
+                await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
                 return
 
             emoji = self.pi_emojis.get(tipo.lower(), '⏱️')
@@ -117,9 +111,9 @@ class PiCog(commands.Cog):
                 color=0xFFA500
             )
             embed.set_footer(text="Actualización automática cada minuto")
-            
+
             msg = await ctx.send(embed=embed)
-            
+
             self.pi_countdown_data[msg.id] = {
                 'end_time': time.time() + (tiempo * 60),
                 'channel_id': ctx.channel.id,
@@ -139,38 +133,37 @@ class PiCog(commands.Cog):
     async def update_timers(self):
         current_time = time.time()
         expired = []
-        
+
         for msg_id, timer in list(self.pi_countdown_data.items()):
             try:
                 channel = self.bot.get_channel(timer['channel_id'])
                 if not channel:
                     expired.append(msg_id)
                     continue
-                    
+
                 msg = await channel.fetch_message(timer['message_id'])
                 remaining = max(0, int((timer['end_time'] - current_time) / 60))
-                
+
                 if remaining <= 0:
                     embed = msg.embeds[0]
                     embed.description = f"**📍 Ubicación:** {timer['ubicacion']}\n**🔄 Estado:** **¡Timer completado!**"
-                    embed.color = 0x00FF00  # Verde
+                    embed.color = 0x00FF00
                     await msg.edit(embed=embed)
                     expired.append(msg_id)
                 else:
                     embed = msg.embeds[0]
                     embed.description = f"**📍 Ubicación:** {timer['ubicacion']}\n**⏳ Tiempo restante:** **{remaining} minutos**"
                     await msg.edit(embed=embed)
-                    
+
             except discord.NotFound:
                 expired.append(msg_id)
             except Exception as e:
                 print(f"[ERROR] Actualizando timer {msg_id}: {str(e)}")
                 expired.append(msg_id)
-        
-        # Limpieza
+
         for msg_id in expired:
             self.pi_countdown_data.pop(msg_id, None)
-            
+
         if not self.pi_countdown_data:
             self.update_timers.stop()
 
@@ -180,3 +173,4 @@ class PiCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(PiCog(bot))
+
