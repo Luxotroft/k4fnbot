@@ -1277,6 +1277,12 @@ async def on_ready():
     if not cleanup_roaming_events.is_running():
         cleanup_roaming_events.start()
         print("Started cleanup_roaming_events task.")
+    # --- AÑADE ESTA ÚNICA LÍNEA PARA IMPORTAR EL COG ---
+    try:
+        await bot.load_extension('pi_cog')
+        print("Successfully loaded pi_cog.")
+    except Exception as e:
+        print(f"Failed to load pi_cog: {e}")
 
 @bot.event
 async def on_message(message):
