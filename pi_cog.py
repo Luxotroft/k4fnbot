@@ -230,6 +230,21 @@ class PiCog(commands.Cog):
     @update_timers.before_loop
     async def before_updater(self):
         await self.bot.wait_until_ready()
+    
+    @commands.command(name='clear')
+    @commands.has_permissions(manage_messages=True)
+    async def clear_messages(self, ctx, amount: int):
+        """Elimina un número especificado de mensajes."""
+        # Asegúrate de que el bot tenga el permiso 'Administrar mensajes' en el servidor.
+        if amount <= 0:
+            return await ctx.send("El número de mensajes a eliminar debe ser mayor que 0.", delete_after=5)
+        
+        # +1 para eliminar también el mensaje de invocación del comando
+        # Se elimina el mensaje de la persona que lo pidió y los que le siguen.
+        await ctx.channel.purge(limit=amount + 1)
+        
+        # Envía un mensaje de confirmación que se eliminará automáticamente después de 5 segundos
+        await ctx.send(f"✅ Se han eliminado {amount} mensajes.", delete_after=5)
 
 async def setup(bot):
     await bot.add_cog(PiCog(bot))
