@@ -8,7 +8,9 @@ import random
 from discord.ui import Button, View, Select
 from dotenv import load_dotenv
 import os
+import re # Se importa el módulo re para la extracción de IDs de usuario
 from keep_alive import keep_alive
+
 load_dotenv()
 
 # ====================================================================
@@ -159,8 +161,8 @@ ROAMING_PARTIES = {
             "Putrefacto": 1,
             "Tallada": 1,
             "Astral": 1,
-            "Patas de oso": 3,  # 3 slots para Patas de oso
-            "Hoja infinita": 1,
+            "Patas de oso": 1,  # 3 slots para Patas de oso
+            "Hoja infinita": 3,
             "Colmillo": 1,
             "Guadaña": 1,
             "Puas": 1
@@ -205,6 +207,10 @@ ROAMING_PARTIES = {
         }
     }
 }
+
+wb_events = {} # {event_id: {data}}
+wb_priority_users = {} # {event_id: {"users": [], "expiry": timestamp, "slots": int}}
+WB_EVENT_TIMEOUT = 7200 # 2 horas
 
 # --- Datos para Roaming Parties ---
 roaming_events = {} # {event_id: {data}}
@@ -322,7 +328,7 @@ async def update_wb_embed(event_id):
                     f"👥 **Usuarios prioritarios:** {', '.join([f'<@{uid}>' for uid in priority_data['users']])}\n"
                     f"📊 **Slots usados:** {len(priority_data['users'])}/{priority_data['slots']}"
                 )
-                is_disabled = False
+                is_disabled = True # Se deshabilita para no-prioritarios
                 footer_text = "🔒 Solo usuarios prioritarios pueden anotarse"
                 embed_color = 0xFF4500
             else:
@@ -403,16 +409,6 @@ class WB_RoleSelectorView(discord.ui.View):
         # 4. Deshabilitar todos los componentes de la vista
         for item in self.children:
             item.disabled = True
-
-        # CAMBIO: Cierra el hilo asociado al mensaje
-        try:
-            # Los hilos tienen el mismo ID que el mensaje principal
-            thread = interaction.channel.get_thread(interaction.message.id)
-            if thread:
-                await thread.edit(archived=True, locked=True) # Archivar y bloquear el hilo
-                print(f"Hilo del evento WB {self.event_id} archivado/bloqueado.")
-        except Exception as e:
-            print(f"Error al archivar/bloquear el hilo del WB {self.event_id}: {e}")
 
         # 5. Eliminar el evento del diccionario global
         del wb_events[self.event_id]
@@ -616,7 +612,7 @@ class WB_WaitlistRoleDropdown(discord.ui.Select):
 
         # Re-check if role is still full
         if len(event["inscriptions"][role]) < WB_BOSS_DATA[self.boss]["roles"][role]:
-            await interaction.response.send_message(f"🎉 ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
+            await interaction.response.send_message(f"✅ ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
             await update_wb_embed(self.event_id) # Update embed to reflect open slot
             return
 
@@ -784,15 +780,6 @@ class RoamingEventView(discord.ui.View):
         # Deshabilitar todos los componentes de la vista
         for item in self.children:
             item.disabled = True
-        
-        # CAMBIO: Cierra el hilo asociado al mensaje
-        try:
-            thread = interaction.channel.get_thread(interaction.message.id)
-            if thread:
-                await thread.edit(archived=True, locked=True)
-                print(f"Hilo del evento {self.event_id} archivado/bloqueado.")
-        except Exception as e:
-            print(f"Error al archivar/bloquear el hilo del roaming {self.event_id}: {e}")
 
         # 3. Eliminar el evento del diccionario global
         if self.event_id in roaming_events:
@@ -805,118 +792,6 @@ class RoamingEventView(discord.ui.View):
 # ====================================================================
 # --- 5. COMANDOS (SLASH Y PREFIX) ---
 # ====================================================================
-
-# --- Nuevo Comando Slash para World Boss ---
-@bot.tree.command(name="wb", description="Crea un evento de World Boss con inscripción de roles.")
-@discord.app_commands.describe(
-    boss="Elige el jefe de mundo (elder/eye).",
-    duration="Duración estimada del contenido (ej: 2h).",
-    priority_users="Menciona usuarios con prioridad de inscripción (ej: @user1 @user2).",
-    priority_slots="Número de slots prioritarios para los usuarios mencionados.",
-    priority_time_min="Tiempo en minutos para la prioridad de inscripción (default 10).",
-    image_url="URL de una imagen para añadir al embed."
-)
-@discord.app_commands.choices(boss=[
-    discord.app_commands.Choice(name="Eldersleep", value="elder"),
-    discord.app_commands.Choice(name="Eye of the Forest", value="eye"),
-])
-async def wb(interaction: discord.Interaction, boss: discord.app_commands.Choice[str], duration: str, priority_users: str = None, priority_slots: int = 5, priority_time_min: int = 10, image_url: str = None):
-    """
-    Crea un evento de World Boss con un sistema de prioridad opcional.
-    """
-    await interaction.response.defer(ephemeral=False) # Defer the response to allow time for the embed to be created
-
-    boss_key = boss.value
-    event_id = f"wb-{interaction.user.id}-{int(time.time())}"
-    
-    # Initialize the event data structure
-    inscriptions = {role: [] for role in WB_BOSS_DATA[boss_key]["roles"]}
-    waitlist = {role: [] for role in WB_BOSS_DATA[boss_key]["roles"]}
-
-    # Create the embed
-    embed_description = WB_BOSS_DATA[boss_key]["default_description"].format(duration=duration)
-    
-    # CAMBIO: Se ajusta la hora de salida a la hora actual de Viña del Mar, que es UTC-3.
-    # Se usa `datetime.now()` y se formatea.
-    current_time_vdm = datetime.now() - timedelta(hours=3) # UTC-3
-    embed = discord.Embed(
-        title=f"⚔️ WORLD BOSS: {boss.name.upper()} (Caller: {interaction.user.display_name})",
-        description=f"**Salida: {current_time_vdm.strftime('%H:%M')} (UTC-3)**\n\n{embed_description}",
-        color=0x8B0000
-    )
-
-    if image_url:
-        embed.set_image(url=image_url)
-
-    # Priority logic
-    priority_mode = False
-    priority_user_ids = []
-    if priority_users:
-        priority_mode = True
-        user_mentions = [m.id for m in interaction.guild.get_members_from_text(priority_users)] # No esta funcion...
-        # Workaround to get user IDs from mentions
-        import re
-        user_id_matches = re.findall(r'<@!?(\d+)>', priority_users)
-        priority_user_ids = [int(uid) for uid in user_id_matches]
-        
-        # Add caller to priority list if not already there
-        if interaction.user.id not in priority_user_ids:
-            priority_user_ids.append(interaction.user.id)
-            
-        priority_expiry_time = time.time() + (priority_time_min * 60)
-        
-        # Save priority data
-        wb_priority_users[event_id] = {
-            "users": priority_user_ids,
-            "expiry": priority_expiry_time,
-            "slots": priority_slots
-        }
-        
-        # Update embed description to reflect priority mode
-        embed.description = (
-            f"{embed.description}\n\n"
-            f"🎯 **Sistema de Prioridad Activo**\n"
-            f"⏳ **Tiempo restante:** {priority_time_min} minutos\n"
-            f"👥 **Usuarios prioritarios:** {', '.join([f'<@{uid}>' for uid in priority_user_ids])}\n"
-            f"📊 **Slots disponibles:** {priority_slots}"
-        )
-        embed.color = 0xFF4500 # Orange for priority
-        
-    for role in WB_BOSS_DATA[boss_key]["roles"]:
-        embed.add_field(
-            name=f"{WB_BOSS_DATA[boss_key]['emojis'].get(role)} {role} (0/{WB_BOSS_DATA[boss_key]['roles'][role]} +0 en espera)",
-            value="🚫 Vacío",
-            inline=False
-        )
-
-    # Save event data in global dictionary
-    wb_events[event_id] = {
-        "event_id": event_id,
-        "caller_id": interaction.user.id,
-        "channel_id": interaction.channel.id,
-        "boss": boss_key,
-        "duration": duration,
-        "start_time": time.time(),
-        "inscriptions": inscriptions,
-        "waitlist": waitlist,
-        "message": None,
-        "description": embed_description,
-        "priority_mode": priority_mode,
-    }
-
-    # Send the message with the View
-    view = WB_RoleSelectorView(boss_key, event_id, interaction.user.id, disabled=priority_mode)
-    message = await interaction.followup.send(embed=embed, view=view)
-    
-    # Store the message object in the event data
-    wb_events[event_id]["message"] = message
-    
-    # Create a thread for the event
-    try:
-        thread = await message.create_thread(name=f"💬 Discusión sobre WB {boss.name}")
-        print(f"Hilo creado con éxito para WB: {thread.name}")
-    except Exception as e:
-        print(f"Error al crear el hilo para WB: {e}")
 
 # --- Comando Slash para cerrar cualquier evento ---
 @bot.tree.command(name="close", description="Cierra un evento de World Boss o Roaming que hayas creado.")
@@ -952,15 +827,6 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
                         item.disabled = True
 
                     await message_to_edit.edit(embed=embed, view=view)
-                    
-                    # CAMBIO: Cierra el hilo asociado al mensaje de World Boss
-                    try:
-                        thread = channel.get_thread(message_to_edit.id)
-                        if thread:
-                            await thread.edit(archived=True, locked=True)
-                            print(f"Hilo del evento WB {eid} archivado/bloqueado por comando slash.")
-                    except Exception as e:
-                        print(f"Error al archivar/bloquear el hilo del WB {eid} por comando slash: {e}")
 
                 except discord.NotFound:
                     print(f"Mensaje para el evento WB {eid} no encontrado. No se puede editar.")
@@ -995,15 +861,6 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
                             item.disabled = True
 
                         await message_to_edit.edit(embed=embed, view=view)
-                        
-                        # CAMBIO: Cierra el hilo asociado al mensaje de Roaming
-                        try:
-                            thread = channel.get_thread(message_to_edit.id)
-                            if thread:
-                                await thread.edit(archived=True, locked=True)
-                                print(f"Hilo del evento Roaming {eid} archivado/bloqueado por comando slash.")
-                        except Exception as e:
-                            print(f"Error al archivar/bloquear el hilo del roaming {eid} por comando slash: {e}")
 
                     except discord.NotFound:
                         print(f"Mensaje para el evento Roaming {eid} no encontrado. No se puede editar.")
@@ -1020,28 +877,164 @@ async def close_event_slash(interaction: discord.Interaction, event_id: str = No
     else:
         await interaction.response.send_message("❌ No se encontró ningún evento activo que hayas creado.", ephemeral=True)
 
+# --- Comando Slash para World Boss ---
+@bot.tree.command(name="wb", description="Crea un evento de World Boss con o sin prioridad.")
+@discord.app_commands.describe(
+    caller="El nombre del caller del World Boss.",
+    boss="El World Boss (elder o eye).",
+    duracion="La duración del evento (ej: '2 horas', '90 minutos').",
+    prios="Número de slots prioritarios (opcional, 1-20).",
+    tiempo_prios="Duración del modo prioridad en minutos (opcional, 1-60).",
+    miembros_prio="Menciona los usuarios prioritarios (ej: '@User1 @User2')."
+)
+async def wb_slash(
+    interaction: discord.Interaction,
+    caller: str,
+    boss: str,
+    duracion: str,
+    prios: int = 0,
+    tiempo_prios: int = 0,
+    miembros_prio: str = None
+):
+    """
+    Crea un evento de World Boss.
+    """
+    boss_lower = boss.lower()
+    if boss_lower not in WB_BOSS_DATA:
+        return await interaction.response.send_message("❌ Boss inválido. Usa `elder` o `eye`.", ephemeral=True)
+
+    # Verificar si el usuario ya tiene un evento activo
+    for event_id, event_data in wb_events.items():
+        if event_data["caller_id"] == interaction.user.id:
+            return await interaction.response.send_message("❌ Ya tienes un evento activo. Usa `/close` para cerrarlo primero.", ephemeral=True)
+
+    has_priority = (prios > 0 and tiempo_prios > 0)
+
+    # Parsear los miembros prioritarios si se proporcionaron
+    mentioned_users = []
+    if miembros_prio:
+        for mention in miembros_prio.split():
+            try:
+                user_id = int(mention.replace('<@', '').replace('!', '').replace('>', ''))
+                user = interaction.guild.get_member(user_id) 
+                if user:
+                    mentioned_users.append(user)
+            except ValueError:
+                pass
+
+    if has_priority:
+        if interaction.user not in mentioned_users:
+            mentioned_users.insert(0, interaction.user)
+
+        if len(mentioned_users) > prios:
+            return await interaction.response.send_message(f"❌ Solo puedes asignar {prios} usuarios prioritarios. Has mencionado {len(mentioned_users)} (incluyéndote).", ephemeral=True)
+
+    event_id = f"WB-{int(time.time())}"
+    description_content = WB_BOSS_DATA[boss_lower]["default_description"].format(duration=duracion)
+
+    # Creamos la entrada del evento en el diccionario global
+    wb_events[event_id] = {
+        "caller": caller,
+        "caller_id": interaction.user.id,
+        "boss": boss_lower,
+        "inscriptions": {role: [] for role in WB_BOSS_DATA[boss_lower]["roles"]},
+        "waitlist": {role: [] for role in WB_BOSS_DATA[boss_lower]["roles"]},
+        "priority_mode": has_priority,
+        "priority_slots": prios if has_priority else 0,
+        "priority_minutes": tiempo_prios if has_priority else 0,
+        "message": None,
+        "channel_id": interaction.channel.id,
+        "description": description_content
+    }
+
+    # Asignamos el evento a una variable local para evitar el UnboundLocalError
+    event = wb_events[event_id]
+
+    embed_description = description_content
+    footer_text = ""
+    embed_color = 0x8B0000
+    view_disabled = False
+
+    if has_priority:
+        priority_expiry_time = time.time() + (tiempo_prios * 60)
+        wb_priority_users[event_id] = {
+            "users": [user.id for user in mentioned_users],
+            "expiry": priority_expiry_time,
+            "slots": prios,
+            "minutes": tiempo_prios
+        }
+        embed_description += (
+            f"\n\n🎯 **Sistema de Prioridad Activado**\n"
+            f"⏳ **Usuarios prioritarios:** {', '.join([f'<@{uid}>' for uid in wb_priority_users[event_id]['users']])}\n"
+            f"🕒 **Bloqueo termina en:** <t:{int(priority_expiry_time)}:R>\n"
+            f"📊 **Slots usados:** {len(mentioned_users)}/{prios}"
+        )
+        footer_text = "🔒 Solo usuarios prioritarios pueden anotarse"
+        embed_color = 0xFF4500
+        view_disabled = False
+    else:
+        footer_text = "🔓 Todos pueden anotarse"
+        embed_color = 0x00FF00
+
+    embed = discord.Embed(
+        title=f"🌍 WORLD BOSS: {WB_BOSS_DATA[boss_lower]['name']} (Caller: {caller})",
+        description=embed_description,
+        color=embed_color
+    )
+    embed.set_footer(text=footer_text)
+
+    for role in WB_BOSS_DATA[boss_lower]["roles"]:
+        players_in_role = ", ".join([f"<@{uid}>" for uid in event["inscriptions"][role]])
+        waitlist_players = ", ".join([f"<@{uid}>" for uid in event["waitlist"][role]])
+
+        role_status = ""
+        if players_in_role:
+            role_status += f"👥 {players_in_role}"
+        if waitlist_players:
+            role_status += f"\n⏳ Espera: {waitlist_players}"
+
+        if not role_status:
+            role_status = "🚫 Vacío"
+
+        embed.add_field(
+            name=f"{WB_BOSS_DATA[boss_lower]['emojis'].get(role)} {role} ({len(event['inscriptions'][role])}/{WB_BOSS_DATA[boss_lower]['roles'][role]} +{len(event['waitlist'][role])} en espera)",
+            value=role_status,
+            inline=False
+        )
+
+    # --- MODIFICACIÓN: Pasamos el caller_id a la vista ---
+    view = WB_RoleSelectorView(boss_lower, event_id, interaction.user.id, disabled=view_disabled)
+
+    await interaction.response.send_message(embed=embed, view=view)
+    message = await interaction.original_response()
+    event["message"] = message
+
+    # --- DIAGNÓSTICO: Verificamos si llegamos a esta parte del código y si el mensaje es válido ---
+    print("\n--- Intentando crear el hilo para /wb...")
+    print(f"Objeto del mensaje: {message}")
+
+    try:
+        thread = await message.create_thread(name=f"💬 Discusión sobre WB {WB_BOSS_DATA[boss_lower]['name']}")
+        print(f"Hilo creado con éxito: {thread.name}")
+    except discord.Forbidden:
+        print("ERROR: No se pudo crear el hilo. A pesar de los permisos de Administrador, algo está impidiendo la creación. Revisa los permisos del canal.")
+    except Exception as e:
+        print(f"Ocurrió un error inesperado al crear el hilo: {e}")
+
 # --- Comandos de Prefijo para Roaming ---
 @bot.command(name='roaming', aliases=['r'])
-async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, time_str: str = None, swap_gank: str = "no", *args):
+async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
     """
-    Crea un evento de roaming con opciones de hora y swap de gank.
-    Ej: !r kiteo1 T8 1400 3.30UTC si pepito
-    Ej: !r brawl T7 1300 no
+    Crea un evento de roaming con la opción de asignar un caller.
+    Ej: !r kiteo1 8 1400 (caller es el que envía el comando)
+    Ej: !r kiteo1 8 1400 Pepito (caller es Pepito)
     """
     party_lower = party.lower()
     if party_lower not in ROAMING_PARTIES:
         return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
-    
+
     # Determina el nombre del caller a mostrar en el embed usando la nueva lógica
     caller_display = get_roaming_caller_info(ctx, args)
-    
-    # Maneja los argumentos para obtener la hora, swap y caller_display
-    # Esto es un poco más complejo debido a que los argumentos posicionales pueden variar
-    
-    # Revisa si el último argumento es 'si' o 'no'
-    swap_gank_status = False
-    if swap_gank.lower() == 'si':
-        swap_gank_status = True
 
     event_id = f"{ctx.author.id}-{int(time.time())}"
 
@@ -1058,8 +1051,6 @@ async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, time_str: s
         "party": party_lower,
         "tier_min": tier.upper(),
         "ip_min": ip,
-        "time": time_str, # Agregamos el campo de la hora
-        "swap_gank": swap_gank_status, # Agregamos el campo de swap de gank
         "start_time": time.time(),
         "message": None,
         "inscripciones": inscripciones_dict,
@@ -1138,25 +1129,6 @@ async def on_ready():
                 else:
                     print(f"Channel for event {event_id} not found. Skipping.")
 
-        # CAMBIO: Reanudar vistas de World Boss
-        for event_id, event_data in wb_events.items():
-            if event_data.get("message"):
-                channel = bot.get_channel(event_data["channel_id"])
-                if channel:
-                    try:
-                        message = await channel.fetch_message(event_data["message"].id)
-                        view = WB_RoleSelectorView(
-                            boss=event_data["boss"],
-                            event_id=event_id,
-                            caller_id=event_data["caller_id"]
-                        )
-                        bot.add_view(view, message_id=message.id)
-                        print(f"Re-added WB view for event {event_id}")
-                    except discord.NotFound:
-                        print(f"Message for WB event {event_id} not found. Skipping.")
-                else:
-                    print(f"Channel for WB event {event_id} not found. Skipping.")
-
     except Exception as e:
         print(f"Failed to re-add views: {e}")
 
@@ -1165,9 +1137,6 @@ async def on_ready():
     if not cleanup_roaming_events.is_running():
         cleanup_roaming_events.start()
         print("Started cleanup_roaming_events task.")
-    if not cleanup_wb_events.is_running():
-        cleanup_wb_events.start()
-        print("Started cleanup_wb_events task.")
 
 @bot.event
 async def on_message(message):
@@ -1205,63 +1174,13 @@ async def cleanup_roaming_events():
                     for item in view.children:
                         item.disabled = True
                     await message.edit(embed=embed, view=view)
-                    
-                    # CAMBIO: Cierra el hilo asociado al mensaje de roaming
-                    try:
-                        thread = message.thread # thread es una propiedad del objeto Message
-                        if thread:
-                            await thread.edit(archived=True, locked=True)
-                            print(f"Hilo del evento Roaming {event_id} archivado/bloqueado por expiración.")
-                    except Exception as e:
-                        print(f"Error al archivar/bloquear el hilo del roaming {event_id} por expiración: {e}")
-
                 except Exception as e:
                     print(f"Error editing expired roaming message: {e}")
             del roaming_events[event_id]
 
-# Tarea para limpiar eventos de WB antiguos
-@tasks.loop(minutes=30)
-async def cleanup_wb_events():
-    now = time.time()
-    events_to_remove = []
-    for event_id, event_data in wb_events.items():
-        if (now - event_data["start_time"]) > WB_EVENT_TIMEOUT:
-            events_to_remove.append(event_id)
-
-    for event_id in events_to_remove:
-        event_data = wb_events.get(event_id)
-        if event_data:
-            print(f"Cleaning up WB event {event_id} due to timeout.")
-            message = event_data.get("message")
-            if message:
-                try:
-                    embed = message.embeds[0]
-                    embed.title = f"⚠️ WORLD BOSS: {event_data['boss'].upper()} (EXPIRADO)"
-                    embed.description = "**Este evento ha expirado y se ha cerrado automáticamente.**"
-                    embed.color = discord.Color.dark_gray()
-                    view = WB_RoleSelectorView(event_data['boss'], event_id, event_data['caller_id'], disabled=True)
-                    await message.edit(embed=embed, view=view)
-
-                    # CAMBIO: Cierra el hilo del WB expirado
-                    try:
-                        thread = message.thread
-                        if thread:
-                            await thread.edit(archived=True, locked=True)
-                            print(f"Hilo del evento WB {event_id} archivado/bloqueado por expiración.")
-                    except Exception as e:
-                        print(f"Error al archivar/bloquear el hilo del WB {event_id} por expiración: {e}")
-
-                except Exception as e:
-                    print(f"Error editing expired WB message: {e}")
-            del wb_events[event_id]
-
 # La función before_loop se mantiene igual, ya que es la forma correcta de esperar.
 @cleanup_roaming_events.before_loop
 async def before_cleanup_roaming():
-    await bot.wait_until_ready()
-
-@cleanup_wb_events.before_loop
-async def before_cleanup_wb():
     await bot.wait_until_ready()
 
 # ====================================================================
