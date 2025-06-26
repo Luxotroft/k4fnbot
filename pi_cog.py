@@ -165,6 +165,8 @@ class PiCog(commands.Cog):
             tiempo_formateado = self.format_time_remaining(tiempo_minutos)
             
             mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo_formateado} restantes*"
+            
+            print(f"[DEBUG] tipo_base: {tipo_base}, emoji: {emoji}")  # Debug temporal
 
             msg = await ctx.send(mensaje)
 
