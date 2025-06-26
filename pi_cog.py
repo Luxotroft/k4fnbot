@@ -235,7 +235,7 @@ class PiCog(commands.Cog):
     async def before_updater(self):
         await self.bot.wait_until_ready()
     
-    @commands.command(name='clear')
+    @commands.command(name='borra')
     @commands.has_permissions(manage_messages=True)
     async def clear_messages(self, ctx, amount: int):
         """Elimina un número especificado de mensajes."""
