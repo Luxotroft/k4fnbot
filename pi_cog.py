@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 import time
+import re
 from datetime import timedelta
 
 class PiCog(commands.Cog):
@@ -15,6 +16,44 @@ class PiCog(commands.Cog):
         }
         print("✅ Módulo P.I. cargado (comandos !pi y !ayuda)")
 
+    def parse_time(self, time_str):
+        """Parsea tiempo en formato como '1h30', '30m', '2h', '90' (minutos)"""
+        time_str = time_str.lower().strip()
+        
+        # Patrón para capturar horas y minutos
+        pattern = r'(?:(\d+)h)?(?:(\d+)m?)?$'
+        match = re.match(pattern, time_str)
+        
+        if match:
+            hours = int(match.group(1)) if match.group(1) else 0
+            minutes = int(match.group(2)) if match.group(2) else 0
+            
+            # Si no hay 'h' o 'm', asumimos que son minutos
+            if not re.search(r'[hm]', time_str):
+                minutes = int(time_str) if time_str.isdigit() else 0
+                hours = 0
+            
+            total_minutes = hours * 60 + minutes
+            return total_minutes if total_minutes > 0 else None
+        
+        # Si no coincide con el patrón, intentar como número simple (minutos)
+        if time_str.isdigit():
+            return int(time_str)
+        
+        return None
+
+    def format_time_remaining(self, minutes):
+        """Formatea el tiempo restante en horas y minutos o solo minutos"""
+        if minutes >= 60:
+            hours = minutes // 60
+            mins = minutes % 60
+            if mins == 0:
+                return f"{hours}h"
+            else:
+                return f"{hours}h{mins:02d}"
+        else:
+            return f"{minutes}m"
+
     @commands.command(name='ayuda')
     async def ayuda(self, ctx):
         embed = discord.Embed(
@@ -25,10 +64,15 @@ class PiCog(commands.Cog):
         embed.add_field(
             name="⏰ **COMANDOS P.I. (!pi)**",
             value=(
-                "```!pi <tipo> <minutos> <ubicación>```\n"
+                "```!pi <tipo> <tiempo> <ubicación>```\n"
                 "**Ejemplos:**\n"
-                "• `!pi vortex azul 20 Fort Sterling`\n"
-                "• `!pi mineral 30 \"Thetford Portal\"`\n\n"
+                "• `!pi vortex azul 20 Fort Sterling` (20 minutos)\n"
+                "• `!pi vortex azul 1h30 Fort Sterling` (1 hora 30 min)\n"
+                "• `!pi mineral 2h \"Thetford Portal\"` (2 horas)\n\n"
+                "**Formatos de tiempo:**\n"
+                "• `30` o `30m` = 30 minutos\n"
+                "• `1h` = 1 hora\n"
+                "• `1h30` = 1 hora 30 minutos\n\n"
                 "**Tipos válidos:**\n"
                 "• Orbes: `verde`, `azul`, `morado`, `dorado`\n"
                 "• Recursos: `mineral`, `madera`, `piel`, `fibra`\n"
@@ -74,39 +118,45 @@ class PiCog(commands.Cog):
 
     @commands.command(name='pi')
     async def pi_command(self, ctx, *, args: str):
-        """Crea un temporizador P.I. (ej: !pi vortex azul 20 Fort Sterling)"""
+        """Crea un temporizador P.I. (ej: !pi vortex azul 1h30 Fort Sterling)"""
         parts = args.split()
-        tiempo = None
+        tiempo_minutos = None
         tiempo_index = -1
 
+        # Buscar el tiempo en los argumentos
         for i, part in enumerate(parts):
-            if part.isdigit():
-                tiempo = int(part)
+            tiempo_parsed = self.parse_time(part)
+            if tiempo_parsed is not None:
+                tiempo_minutos = tiempo_parsed
                 tiempo_index = i
                 break
 
-        if tiempo is None:
-            return await ctx.send("**❌ El tiempo debe ser un número entero**\nEjemplo: `!pi mineral 30 Martlock`")
-        if tiempo <= 0:
+        if tiempo_minutos is None:
+            return await ctx.send("**❌ Formato de tiempo inválido**\nEjemplos: `30`, `1h`, `1h30`, `2h15`\nUso: `!pi <tipo> <tiempo> <ubicación>`")
+        
+        if tiempo_minutos <= 0:
             return await ctx.send("**❌ El tiempo debe ser mayor a cero**")
-        if tiempo > 1440:
-            return await ctx.send("**❌ El tiempo máximo es 1440 minutos (24 horas)**")
+        
+        if tiempo_minutos > 1440:  # 24 horas
+            return await ctx.send("**❌ El tiempo máximo es 24 horas**")
 
         tipo = ' '.join(parts[:tiempo_index])
         ubicacion = ' '.join(parts[tiempo_index + 1:])
 
         if not tipo or not ubicacion:
-            return await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <minutos> <ubicación>`\nEjemplo: `!pi vortex azul 20 Fort Sterling`")
+            return await ctx.send("**❌ Formato incorrecto.** Usa: `!pi <tipo> <tiempo> <ubicación>`\nEjemplo: `!pi vortex azul 1h30 Fort Sterling`")
 
         try:
             emoji = self.pi_emojis.get(tipo.lower(), '⏱️')
             tipo_formateado = tipo.upper()
-            mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo}m restantes*"
+            tiempo_formateado = self.format_time_remaining(tiempo_minutos)
+            
+            mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo_formateado} restantes*"
 
             msg = await ctx.send(mensaje)
 
             self.pi_countdown_data[msg.id] = {
-                'end_time': time.time() + (tiempo * 60),
+                'end_time': time.time() + (tiempo_minutos * 60),
                 'channel_id': ctx.channel.id,
                 'message_id': msg.id,
                 'ubicacion': ubicacion,
@@ -118,7 +168,7 @@ class PiCog(commands.Cog):
 
         except Exception as e:
             print(f"[ERROR] !pi: {str(e)}")
-            await ctx.send("**❌ Error al crear el timer**\nUsa: `!pi <tipo> <minutos> <ubicación>`")
+            await ctx.send("**❌ Error al crear el timer**\nUsa: `!pi <tipo> <tiempo> <ubicación>`")
 
     @tasks.loop(seconds=60.0)
     async def update_timers(self):
@@ -133,16 +183,19 @@ class PiCog(commands.Cog):
                     continue
 
                 msg = await channel.fetch_message(timer['message_id'])
-                remaining = max(0, int((timer['end_time'] - current_time) / 60))
+                remaining_seconds = max(0, timer['end_time'] - current_time)
+                remaining_minutes = int(remaining_seconds / 60)
+                
                 emoji = self.pi_emojis.get(timer['tipo'].lower(), '⏱️')
                 tipo_formateado = timer['tipo'].upper()
 
-                if remaining <= 0:
+                if remaining_minutes <= 0:
                     mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ✅ *¡Ya pasó el timer!*"
                     await msg.edit(content=mensaje)
                     expired.append(msg_id)
                 else:
-                    mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ⏳ *{remaining}m restantes*"
+                    tiempo_formateado = self.format_time_remaining(remaining_minutes)
+                    mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ⏳ *{tiempo_formateado} restantes*"
                     await msg.edit(content=mensaje)
 
             except discord.NotFound:
@@ -163,7 +216,6 @@ class PiCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(PiCog(bot))
-
 
 
 
