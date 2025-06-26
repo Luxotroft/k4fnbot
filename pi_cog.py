@@ -1,4 +1,14 @@
-import discord
+remaining_minutes = int(remaining_seconds / 60)
+                
+                emoji = self.pi_emojis.get(timer['tipo_base'], '⏱️')
+                tipo_formateado = timer['tipo_completo'].upper()
+
+                if remaining_minutes <= 0:
+                    mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ✅ *¡Ya pasó el timer!*"
+                    await msg.edit(content=mensaje)
+                    expired.append(msg_id)
+                else:
+                    tiempoimport discord
 from discord.ext import commands, tasks
 import time
 import re
@@ -166,7 +176,7 @@ class PiCog(commands.Cog):
             
             mensaje = f"{emoji} **{tipo_formateado}** en **{ubicacion}** — ⏳ *{tiempo_formateado} restantes*"
             
-            print(f"[DEBUG] tipo_base: {tipo_base}, emoji: {emoji}")  # Debug temporal
+
 
             msg = await ctx.send(mensaje)
 
@@ -198,7 +208,12 @@ class PiCog(commands.Cog):
                     expired.append(msg_id)
                     continue
 
-                msg = await channel.fetch_message(timer['message_id'])
+                try:
+                    msg = await channel.fetch_message(timer['message_id'])
+                except discord.NotFound:
+                    expired.append(msg_id)
+                    continue
+                
                 remaining_seconds = max(0, timer['end_time'] - current_time)
                 remaining_minutes = int(remaining_seconds / 60)
                 
@@ -207,15 +222,13 @@ class PiCog(commands.Cog):
 
                 if remaining_minutes <= 0:
                     mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ✅ *¡Ya pasó el timer!*"
-                    await msg.edit(content=mensaje)
                     expired.append(msg_id)
                 else:
                     tiempo_formateado = self.format_time_remaining(remaining_minutes)
                     mensaje = f"{emoji} **{tipo_formateado}** en **{timer['ubicacion']}** — ⏳ *{tiempo_formateado} restantes*"
-                    await msg.edit(content=mensaje)
 
-            except discord.NotFound:
-                expired.append(msg_id)
+                await msg.edit(content=mensaje)
+
             except Exception as e:
                 print(f"[ERROR] Actualizando timer {msg_id}: {str(e)}")
                 expired.append(msg_id)
@@ -232,6 +245,3 @@ class PiCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(PiCog(bot))
-
-
-
