@@ -13,7 +13,7 @@ from keep_alive import keep_alive
 load_dotenv()
 
 # ====================================================================
-# --- 1. CONFIGURACIÓN E INSTANCIA DEL BOT ---
+# --- 1. CONFIGURACIÓN E INSTANCIA DEL BOT ALBION ---
 # ====================================================================
 
 # Habilitar intents necesarios para el bot
