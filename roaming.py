@@ -69,9 +69,8 @@ ROAMING_PARTIES = {
             "REDENCION": "<:redencion:1395086294442573957>", "INFORTUNIO": "<:Infortunio:1290858784528531537>",
         },
         "mutually_exclusive_groups": [
-            {"roles": ["MARTILLO 1 H", "PESADA"], "max_total": 2}, # Max 2 entre estos 2 roles
-            {"roles": ["GOLEM", "PESADA"], "max_total": 2}, # Max 2 entre estos 2 roles
-            {"roles": ["INFERNALES", "GRAN BASTON SAGRADO"], "max_total": 2}, # Max 2 entre estos 2 roles
+            {"roles": ["LOCUS", "ENRAIZADO"]},
+            {"roles": ["TALLADA", "CAZAESPÍRITUS"]}
         ]
     },
     "brawl": {
@@ -161,7 +160,6 @@ def create_roaming_embed(party, event_data):
 
     # Agrega la hora si está presente
     if event_data.get("time"):
-        # Agregamos 'UTC' al final de la hora si no lo tiene.
         display_time = event_data["time"]
         if not display_time.upper().endswith('UTC'):
             display_time += ' UTC'
@@ -175,7 +173,7 @@ def create_roaming_embed(party, event_data):
     lineas_roles = []
     for rol, limite in ROAMING_PARTIES[party]["roles"].items():
         inscritos = event_data["inscripciones"].get(rol, [])
-        waitlist_players = event_data["waitlist"].get(rol, []) # Obtiene la lista de espera
+        waitlist_players = event_data["waitlist"].get(rol, [])
         emoji = ROAMING_PARTIES[party]["emojis"].get(rol, "")
         slots = f"{len(inscritos)}/{limite}"
         jugadores = ' '.join(f'<@{uid}>' for uid in inscritos[:3])
@@ -203,7 +201,6 @@ def create_roaming_embed(party, event_data):
         "▸ Traer **embotelladas y comida**\n"
         "▸ **Escuchar calls** y no flamear\n"
     )
-    # El @everyone se envía fuera del embed. Aquí solo se indica un estado.
     if total_inscritos < 15:
         reglas += "▸ 🔔 **Se necesita más gente!**"
     else:
@@ -232,6 +229,9 @@ class RoamingRoleDropdown(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
+        
+        # Pequeño retraso para evitar rate limits
+        await asyncio.sleep(0.5)
 
         user = interaction.user
         selected_role = self.values[0]
@@ -239,33 +239,40 @@ class RoamingRoleDropdown(discord.ui.Select):
         party_data = ROAMING_PARTIES.get(self.party_name)
 
         if not event or not party_data:
-            await interaction.followup.send("Este evento de roaming ya no existe o es inválido.", ephemeral=True)
+            try:
+                await interaction.followup.send("Este evento de roaming ya no existe o es inválido.", ephemeral=True)
+            except discord.errors.HTTPException:
+                pass  # Ignorar errores de rate limit
             return
 
         inscripciones = event.get("inscripciones", {})
         waitlist = event.get("waitlist", {})
         
-        # 1. Eliminar al usuario de CUALQUIER rol o lista de espera
+        # 1. Eliminar al usuario de cualquier rol o lista de espera
         user_id_str = str(user.id)
         user_removed_from_old_spot = False
 
-        # Check inscripciones
         for role_name_in_insc, players_in_role in inscripciones.items():
             if user_id_str in players_in_role:
                 inscripciones[role_name_in_insc].remove(user_id_str)
                 user_removed_from_old_spot = True
-                # Si el rol liberado tiene lista de espera, mover al primero de la espera al rol
                 if waitlist.get(role_name_in_insc):
                     next_player_id = waitlist[role_name_in_insc].pop(0)
                     inscripciones[role_name_in_insc].append(next_player_id)
-                    next_player_obj = interaction.guild.get_member(int(next_player_id)) # Intenta obtener el miembro
-                    if next_player_obj:
-                         await interaction.followup.send(f"<@{next_player_id}>, has sido movido a **{role_name_in_insc}**.", ephemeral=False)
-                    else:
-                        print(f"No se pudo encontrar el miembro con ID {next_player_id} para notificación.")
-                break # Solo puede estar en un rol a la vez
+                    try:
+                        next_player_obj = interaction.guild.get_member(int(next_player_id))
+                        if next_player_obj:
+                            try:
+                                await interaction.followup.send(
+                                    f"<@{next_player_id}>, has sido movido a **{role_name_in_insc}**.",
+                                    ephemeral=False
+                                )
+                            except discord.errors.HTTPException:
+                                pass  # Ignorar errores de rate limit
+                    except Exception:
+                        pass
+                break
 
-        # Check waitlist (si no fue removido de inscripciones)
         if not user_removed_from_old_spot:
             for role_name_in_wl, players_in_wl in waitlist.items():
                 if user_id_str in players_in_wl:
@@ -276,7 +283,6 @@ class RoamingRoleDropdown(discord.ui.Select):
         # 2. Procesar nueva inscripción
         max_slots = party_data["roles"][selected_role]
         
-        # Asegurarse de que las estructuras estén inicializadas
         if selected_role not in inscripciones:
             inscripciones[selected_role] = []
         if selected_role not in waitlist:
@@ -285,71 +291,97 @@ class RoamingRoleDropdown(discord.ui.Select):
         current_players_in_role = len(inscripciones[selected_role])
         
         if current_players_in_role < max_slots:
-            if user_id_str not in inscripciones[selected_role]: # Evitar duplicados
+            if user_id_str not in inscripciones[selected_role]:
                 inscripciones[selected_role].append(user_id_str)
                 msg = f"¡Te has inscrito como **{selected_role}**!"
                 if user_removed_from_old_spot:
                     msg += "\n(Tu inscripción anterior ha sido eliminada.)"
-                await interaction.followup.send(msg, ephemeral=True)
+                try:
+                    await interaction.followup.send(msg, ephemeral=True)
+                except discord.errors.HTTPException:
+                    pass
             else:
                 msg = f"ℹ️ Ya estás inscrito como **{selected_role}**."
-                await interaction.followup.send(msg, ephemeral=True)
+                try:
+                    await interaction.followup.send(msg, ephemeral=True)
+                except discord.errors.HTTPException:
+                    pass
         else:
-            # Añadir a la lista de espera
-            if user_id_str not in waitlist[selected_role]: # Evitar duplicados
+            if user_id_str not in waitlist[selected_role]:
                 waitlist[selected_role].append(user_id_str)
                 msg = f"**{selected_role}** está lleno. Has sido añadido a la lista de espera para este rol."
                 if user_removed_from_old_spot:
                     msg += "\n(Tu inscripción anterior ha sido eliminada.)"
-                await interaction.followup.send(msg, ephemeral=True)
+                try:
+                    await interaction.followup.send(msg, ephemeral=True)
+                except discord.errors.HTTPException:
+                    pass
             else:
                 msg = f"ℹ️ Ya estás en la lista de espera para **{selected_role}**."
-                await interaction.followup.send(msg, ephemeral=True)
+                try:
+                    await interaction.followup.send(msg, ephemeral=True)
+                except discord.errors.HTTPException:
+                    pass
         
-        # Actualizar el mensaje del embed
+        # Actualizar el mensaje del embed con retraso
+        await asyncio.sleep(1)
         if event.get("message"):
-            updated_embed = create_roaming_embed(self.party_name, event)
-            if updated_embed:
-                await event["message"].edit(embed=updated_embed, view=RoamingView(self.event_id, self.party_name, event.get("caller_id")))
+            try:
+                updated_embed = create_roaming_embed(self.party_name, event)
+                await event["message"].edit(
+                    embed=updated_embed, 
+                    view=RoamingView(self.event_id, self.party_name, event.get("caller_id"))
+            except discord.errors.HTTPException:
+                pass  # Ignorar errores de rate limit
 
 class RoamingView(discord.ui.View):
     def __init__(self, event_id: str, party_name: str, caller_id: int):
-        super().__init__(timeout=None) # La vista persiste indefinidamente
+        super().__init__(timeout=None)
         self.event_id = event_id
         self.party_name = party_name
         self.caller_id = caller_id
         
-        # Añadir el dropdown de roles
         self.add_item(RoamingRoleDropdown(event_id, party_name))
 
     @discord.ui.button(label="Salir de Roaming", style=discord.ButtonStyle.red, emoji="🏃", custom_id="roaming_leave_button")
     async def leave_roaming(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
+        await asyncio.sleep(0.5)  # Pequeño retraso
+        
         user = interaction.user
         event = roaming_events.get(self.event_id)
         
         if not event:
-            await interaction.followup.send("Este evento de roaming ya no existe.", ephemeral=True)
+            try:
+                await interaction.followup.send("Este evento de roaming ya no existe.", ephemeral=True)
+            except discord.errors.HTTPException:
+                pass
             return
 
         user_id_str = str(user.id)
         user_found_and_removed = False
 
-        # Eliminar de inscripciones
         for role_name, players in event["inscripciones"].items():
             if user_id_str in players:
                 event["inscripciones"][role_name].remove(user_id_str)
                 user_found_and_removed = True
-                # Mover de la lista de espera al rol si hay espacio
                 if event["waitlist"].get(role_name):
                     next_player_id = event["waitlist"][role_name].pop(0)
                     event["inscripciones"][role_name].append(next_player_id)
-                    next_player_obj = interaction.guild.get_member(int(next_player_id))
-                    if next_player_obj:
-                         await interaction.followup.send(f"<@{next_player_id}>, has sido movido a **{role_name}**.", ephemeral=False)
+                    try:
+                        next_player_obj = interaction.guild.get_member(int(next_player_id))
+                        if next_player_obj:
+                            try:
+                                await interaction.followup.send(
+                                    f"<@{next_player_id}>, has sido movido a **{role_name}**.",
+                                    ephemeral=False
+                                )
+                            except discord.errors.HTTPException:
+                                pass
+                    except Exception:
+                        pass
                 break
         
-        # Eliminar de lista de espera si no estaba en inscripciones
         if not user_found_and_removed:
             for role_name, players in event["waitlist"].items():
                 if user_id_str in players:
@@ -358,24 +390,48 @@ class RoamingView(discord.ui.View):
                     break
 
         if user_found_and_removed:
-            await interaction.followup.send("Has abandonado tu rol/lugar en la lista de espera para este roaming.", ephemeral=True)
+            try:
+                await interaction.followup.send(
+                    "Has abandonado tu rol/lugar en la lista de espera para este roaming.",
+                    ephemeral=True
+                )
+            except discord.errors.HTTPException:
+                pass
+            
+            await asyncio.sleep(1)
             if event.get("message"):
-                updated_embed = create_roaming_embed(self.party_name, event)
-                await event["message"].edit(embed=updated_embed, view=RoamingView(self.event_id, self.party_name, self.caller_id))
-        else:
-            await interaction.followup.send("No estabas inscrito en ningún rol o lista de espera para este roaming.", ephemeral=True)
+                try:
+                    updated_embed = create_roaming_embed(self.party_name, event)
+                    await event["message"].edit(
+                        embed=updated_embed, 
+                        view=RoamingView(self.event_id, self.party_name, self.caller_id)
+                    )
+                except discord.errors.HTTPException:
+                    pass
 
     @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="roaming_close_button")
     async def close_roaming(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.caller_id:
-            await interaction.response.send_message("❌ Solo el creador del evento puede cerrarlo.", ephemeral=True)
+            try:
+                await interaction.response.send_message(
+                    "❌ Solo el creador del evento puede cerrarlo.",
+                    ephemeral=True
+                )
+            except discord.errors.HTTPException:
+                pass
             return
 
         await interaction.response.defer(ephemeral=True)
         event_data = roaming_events.get(self.event_id)
 
         if not event_data:
-            await interaction.followup.send("Este evento de roaming ya no existe.", ephemeral=True)
+            try:
+                await interaction.followup.send(
+                    "Este evento de roaming ya no existe.",
+                    ephemeral=True
+                )
+            except discord.errors.HTTPException:
+                pass
             return
 
         # Eliminar el hilo si existe
@@ -395,13 +451,8 @@ class RoamingView(discord.ui.View):
                             if thread.archived:
                                 await thread.edit(archived=False, reason="Desarchivando para eliminar roaming")
                             await thread.delete()
-                            print(f"Hilo de Roaming {self.event_id} eliminado.")
-                    else:
-                        print(f"Canal principal {event_data['channel_id']} no encontrado para el hilo del Roaming {self.event_id}.")
-            except (discord.NotFound, discord.Forbidden) as e:
-                print(f"Error al eliminar hilo de Roaming {self.event_id}: {e}. Puede que ya no exista o permisos insuficientes.")
-            except Exception as e:
-                print(f"Error inesperado al eliminar hilo de Roaming {self.event_id}: {e}")
+            except Exception:
+                pass
 
         # Eliminar el mensaje principal
         if event_data.get("message_id") and event_data.get("channel_id"):
@@ -412,21 +463,21 @@ class RoamingView(discord.ui.View):
                     if channel:
                         message_to_delete = await channel.fetch_message(event_data["message_id"])
                         await message_to_delete.delete()
-                        print(f"Mensaje de Roaming {self.event_id} eliminado.")
-            except (discord.NotFound, discord.Forbidden) as e:
-                print(f"Error al eliminar mensaje de Roaming {self.event_id}: {e}. Puede que ya no exista o permisos insuficientes.")
-            except Exception as e:
-                print(f"Error inesperado al eliminar mensaje de Roaming {self.event_id}: {e}")
+            except Exception:
+                pass
 
         # Eliminar el evento del diccionario global
         if self.event_id in roaming_events:
             del roaming_events[self.event_id]
 
-        # --- ¡Línea añadida para la pausa! ---
-        await asyncio.sleep(0.5) # Espera 0.5 segundos antes de enviar el followup
-        
-        await interaction.followup.send("✅ Evento de Roaming cerrado y eliminado.", ephemeral=True)
-
+        await asyncio.sleep(0.5)
+        try:
+            await interaction.followup.send(
+                "✅ Evento de Roaming cerrado y eliminado.",
+                ephemeral=True
+            )
+        except discord.errors.HTTPException:
+            pass
 
 # ====================================================================
 # --- COG DE ROAMING ---
@@ -444,13 +495,6 @@ class RoamingCog(commands.Cog):
     async def start_roaming_event(self, ctx, party_name: str, tier_min: str = None, ip_min: int = None, swap_gank_str: str = None, *, caller_display_name_or_none: str = None):
         """
         Inicia un evento de Roaming con party, tier, IP, swap de gank y caller opcional.
-        Uso: !roaming <party> [tier_min] [ip_min] [swap_gank (si/no)] [caller_display_name]
-        
-        Valores por defecto si no se especifican:
-        - Para 'pocho': tier 4.2, IP 1200, sin swap.
-        - Para otras parties: tier 8, IP 1450, sin swap.
-        - Hora de salida: 15 minutos después de lanzado.
-        - Caller: quien tira el comando.
         """
         party_name_lower = party_name.lower()
         if party_name_lower not in ROAMING_PARTIES:
@@ -459,17 +503,16 @@ class RoamingCog(commands.Cog):
 
         party_data = ROAMING_PARTIES[party_name_lower]
 
-        # --- Definir valores por defecto ---
+        # Valores por defecto
         default_tier = "8"
         default_ip = 1450
         default_swap_gank = False
 
         if party_name_lower == "pocho":
-            default_tier = "4.2" # Mantener como string para permitir "4.2"
+            default_tier = "4.2"
             default_ip = 1200
-            # default_swap_gank se mantiene False
 
-        # --- Asignar valores (explicitos o por defecto) ---
+        # Asignar valores
         final_tier_min = tier_min if tier_min is not None else default_tier
         final_ip_min = ip_min if ip_min is not None else default_ip
         
@@ -481,34 +524,29 @@ class RoamingCog(commands.Cog):
                 final_swap_gank = False
             else:
                 await ctx.send("El valor para 'swap de gank' debe ser 'si' o 'no'. Se usará el valor por defecto.")
-                # final_swap_gank ya tiene el valor por defecto.
 
-        # Validaciones para los valores finales
-        # Para tier_min (puede ser int o float como string "4.2")
+        # Validaciones
         try:
-            tier_val = float(final_tier_min) # Intenta convertir a float para validación
-            if not (1 <= tier_val <= 8.4): # Ajusta el rango si es necesario para 8.4
+            tier_val = float(final_tier_min)
+            if not (1 <= tier_val <= 8.4):
                 await ctx.send("El tier mínimo debe ser un número entre 1 y 8.4. Se usará el valor por defecto.")
-                final_tier_min = default_tier # Vuelve al defecto si es inválido
+                final_tier_min = default_tier
         except ValueError:
             await ctx.send("El tier mínimo debe ser un número válido (ej. 8 o 4.2). Se usará el valor por defecto.")
-            final_tier_min = default_tier # Vuelve al defecto si es inválido
+            final_tier_min = default_tier
 
-        # Para ip_min
         try:
-            if final_ip_min < 0: # O algún mínimo razonable, ej: 1000
+            if final_ip_min < 0:
                 raise ValueError
         except ValueError:
             await ctx.send("La IP mínima debe ser un número válido. Se usará el valor por defecto.")
-            final_ip_min = default_ip # Vuelve al defecto si es inválido
+            final_ip_min = default_ip
         
         caller_display = caller_display_name_or_none if caller_display_name_or_none else ctx.author.display_name
         
         current_event_time = datetime.now()
-        # Hora de salida: 15 minutos después de lanzado
         departure_time = current_event_time + timedelta(minutes=15)
         display_departure_time = departure_time.strftime("%H:%M")
-
 
         event_id = f"roaming-{int(time.time())}-{random.randint(1000, 9999)}"
 
@@ -518,32 +556,31 @@ class RoamingCog(commands.Cog):
             "caller_display": caller_display,
             "channel_id": ctx.channel.id,
             "party_name": party_name_lower,
-            "tier_min": final_tier_min, # Usar el valor final
-            "ip_min": final_ip_min,     # Usar el valor final
-            "swap_gank": final_swap_gank, # Usar el valor final
+            "tier_min": final_tier_min,
+            "ip_min": final_ip_min,
+            "swap_gank": final_swap_gank,
             "inscripciones": {rol: [] for rol in party_data["roles"]},
-            "waitlist": {rol: [] for rol in party_data["roles"]}, # Lista de espera por rol
+            "waitlist": {rol: [] for rol in party_data["roles"]},
             "start_time": time.time(),
             "message_id": None,
             "thread_id": None,
             "thread_channel_id": None,
-            "time": display_departure_time # Usar la hora calculada
+            "time": display_departure_time
         }
 
-        # Enviar el @everyone primero
         try:
             await ctx.send(f"¡Atención @everyone! Se ha iniciado un nuevo Roaming: **{party_name.upper()}**!")
-        except Exception as e:
-            print(f"Error al enviar el @everyone para Roaming {event_id}: {e}")
+        except Exception:
+            pass
 
         embed = create_roaming_embed(party_name_lower, event_data)
         view = RoamingView(event_id, party_name_lower, ctx.author.id)
 
         message = await ctx.send(embed=embed, view=view)
         event_data["message_id"] = message.id
-        event_data["message"] = message # Guardar la referencia al objeto mensaje
+        event_data["message"] = message
 
-        roaming_events[event_id] = event_data # Almacenar el evento después de obtener el message_id
+        roaming_events[event_id] = event_data
 
         # Crear hilo de discusión
         try:
@@ -552,8 +589,8 @@ class RoamingCog(commands.Cog):
             await thread.send(f"¡Hilo de discusión para el roaming {party_name.upper()}!")
             event_data["thread_id"] = thread.id
             event_data["thread_channel_id"] = thread.id
-        except Exception as e:
-            print(f"Error al crear hilo para Roaming {event_id}: {e}")
+        except Exception:
+            pass
 
         # Eliminar mensaje original del comando
         try:
@@ -563,7 +600,7 @@ class RoamingCog(commands.Cog):
 
     @tasks.loop(minutes=30)
     async def cleanup_roaming_events(self):
-        """Limpia eventos de roaming antiguos que hayan superado un umbral de tiempo."""
+        """Limpia eventos de roaming antiguos."""
         current_time = time.time()
         events_to_remove = []
 
@@ -574,39 +611,32 @@ class RoamingCog(commands.Cog):
         for event_id in events_to_remove:
             event_data = roaming_events.get(event_id)
             if event_data:
-                # Intentar eliminar el mensaje principal del evento
+                # Intentar eliminar el mensaje principal
                 if event_data.get("message_id") and event_data.get("channel_id"):
                     try:
                         channel = self.bot.get_channel(event_data["channel_id"])
                         if channel:
                             message_to_delete = await channel.fetch_message(event_data["message_id"])
                             await message_to_delete.delete()
-                            print(f"Mensaje de Roaming {event_id} eliminado durante la limpieza.")
-                    except (discord.NotFound, discord.Forbidden):
-                        print(f"Mensaje de Roaming {event_id} ya no existe o no se pudo acceder durante la limpieza.")
-                    except Exception as e:
-                        print(f"Error inesperado al eliminar mensaje de Roaming {event_id} durante la limpieza: {e}")
+                    except:
+                        pass
 
-                # Intentar eliminar el hilo del evento
+                # Intentar eliminar el hilo
                 if event_data.get("thread_id") and event_data.get("channel_id"):
                     try:
                         channel = self.bot.get_channel(event_data["channel_id"])
                         if channel:
                             thread_to_delete = await channel.fetch_thread(event_data["thread_id"])
                             if thread_to_delete.archived:
-                                await thread_to_delete.edit(archived=False, reason="Desarchivando para eliminar en limpieza de Roaming")
+                                await thread_to_delete.edit(archived=False, reason="Desarchivando para eliminar en limpieza")
                             await thread_to_delete.delete()
-                            print(f"Hilo de Roaming {event_id} eliminado durante la limpieza.")
-                    except (discord.NotFound, discord.Forbidden):
-                        print(f"Hilo de Roaming {event_id} ya no existe o no se pudo acceder durante la limpieza.")
-                    except Exception as e:
-                        print(f"Error inesperado al eliminar hilo de Roaming {event_id} durante la limpieza: {e}")
+                    except:
+                        pass
                 
                 del roaming_events[event_id]
 
     @cleanup_roaming_events.before_loop
     async def before_cleanup_roaming(self):
-        """Espera a que el bot esté listo antes de iniciar la tarea de limpieza."""
         await self.bot.wait_until_ready()
 
 async def setup(bot):
