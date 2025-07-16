@@ -22,7 +22,7 @@ ROAMING_PARTIES = {
         "emojis": {
             "HOJ": "<:ManodeJusticia:1290858364129247242>", "PESADA": "<:stoper:1290858463135662080>",
             "LECHO PEEL": "<:stoper:1290858463135662080>", "LECHO SUP": "<:stoper:1290858463135662080>",
-            "GA": "<:GranArcano:1337861969931407411>", "LOCUS": "<:Locus:12914674222238249043>",
+            "GA": "<:GranArcano:1337861969931407411>", "LOCUS": "<:Locus:1291467422238249043>",
             "JURADORES": "<:Maracas:1290858583965175828>", "ENRAIZADO": "<:Enraizado:1290879541073678397>",
             "LIFECURSED": "<:Maldi:1291467716229730415>", "OCULTO": "<:Oculto:1337862058779218026>",
             "ROMPERREINO": "<:RompeReino:1290881352182399017>", "CAZAESPÍRITUS": "<:Cazaespiritu:1290881433816137821>",
@@ -422,6 +422,9 @@ class RoamingView(discord.ui.View):
         if self.event_id in roaming_events:
             del roaming_events[self.event_id]
 
+        # --- ¡Línea añadida para la pausa! ---
+        await asyncio.sleep(0.5) # Espera 0.5 segundos antes de enviar el followup
+        
         await interaction.followup.send("✅ Evento de Roaming cerrado y eliminado.", ephemeral=True)
 
 
