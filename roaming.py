@@ -182,7 +182,7 @@ def create_roaming_embed(party, event_data):
         if len(inscritos) > 3:
             jugadores += f" (+{len(inscritos)-3} más)"
 
-        linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '-'}"
+        linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '🚫'}"
         if waitlist_players:
             jugadores_espera = ' '.join(f'<@{uid}>' for uid in waitlist_players)
             linea += f" | ⏳ Espera: {jugadores_espera}"
@@ -365,7 +365,7 @@ class RoamingView(discord.ui.View):
         else:
             await interaction.followup.send("No estabas inscrito en ningún rol o lista de espera para este roaming.", ephemeral=True)
 
-    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="-", custom_id="roaming_close_button")
+    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="roaming_close_button")
     async def close_roaming(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.caller_id:
             await interaction.response.send_message("❌ Solo el creador del evento puede cerrarlo.", ephemeral=True)
@@ -438,11 +438,16 @@ class RoamingCog(commands.Cog):
         self.cleanup_roaming_events.cancel()
 
     @commands.command(name='roaming')
-    async def start_roaming_event(self, ctx, party_name: str, tier_min: int, ip_min: int, swap_gank_str: str, *, caller_display_name_or_none: str = None):
+    async def start_roaming_event(self, ctx, party_name: str, tier_min: str = None, ip_min: int = None, swap_gank_str: str = None, *, caller_display_name_or_none: str = None):
         """
         Inicia un evento de Roaming con party, tier, IP, swap de gank y caller opcional.
-        Uso: !roaming <party> <tier_min> <ip_min> <swap_gank (si/no)> [caller_display_name]
-        Ej: !roaming pocho 8 1300 si MiCaller
+        Uso: !roaming <party> [tier_min] [ip_min] [swap_gank (si/no)] [caller_display_name]
+        
+        Valores por defecto si no se especifican:
+        - Para 'pocho': tier 4.2, IP 1200, sin swap.
+        - Para otras parties: tier 8, IP 1450, sin swap.
+        - Hora de salida: 15 minutos después de lanzado.
+        - Caller: quien tira el comando.
         """
         party_name_lower = party_name.lower()
         if party_name_lower not in ROAMING_PARTIES:
@@ -451,28 +456,56 @@ class RoamingCog(commands.Cog):
 
         party_data = ROAMING_PARTIES[party_name_lower]
 
-        if not (1 <= tier_min <= 8):
-            await ctx.send("El tier mínimo debe ser un número entre 1 y 8.")
-            return
+        # --- Definir valores por defecto ---
+        default_tier = "8"
+        default_ip = 1450
+        default_swap_gank = False
+
+        if party_name_lower == "pocho":
+            default_tier = "4.2" # Mantener como string para permitir "4.2"
+            default_ip = 1200
+            # default_swap_gank se mantiene False
+
+        # --- Asignar valores (explicitos o por defecto) ---
+        final_tier_min = tier_min if tier_min is not None else default_tier
+        final_ip_min = ip_min if ip_min is not None else default_ip
         
+        final_swap_gank = default_swap_gank
+        if swap_gank_str is not None:
+            if swap_gank_str.lower() in ('si', 'sí', 'y', 'yes'):
+                final_swap_gank = True
+            elif swap_gank_str.lower() in ('no', 'n'):
+                final_swap_gank = False
+            else:
+                await ctx.send("El valor para 'swap de gank' debe ser 'si' o 'no'. Se usará el valor por defecto.")
+                # final_swap_gank ya tiene el valor por defecto.
+
+        # Validaciones para los valores finales
+        # Para tier_min (puede ser int o float como string "4.2")
         try:
-            ip_min = int(ip_min)
-            if ip_min < 0: # O algún mínimo razonable, ej: 1000
+            tier_val = float(final_tier_min) # Intenta convertir a float para validación
+            if not (1 <= tier_val <= 8.4): # Ajusta el rango si es necesario para 8.4
+                await ctx.send("El tier mínimo debe ser un número entre 1 y 8.4. Se usará el valor por defecto.")
+                final_tier_min = default_tier # Vuelve al defecto si es inválido
+        except ValueError:
+            await ctx.send("El tier mínimo debe ser un número válido (ej. 8 o 4.2). Se usará el valor por defecto.")
+            final_tier_min = default_tier # Vuelve al defecto si es inválido
+
+        # Para ip_min
+        try:
+            if final_ip_min < 0: # O algún mínimo razonable, ej: 1000
                 raise ValueError
         except ValueError:
-            await ctx.send("La IP mínima debe ser un número válido.")
-            return
-
-        swap_gank = False
-        if swap_gank_str.lower() in ('si', 'sí', 'y', 'yes'):
-            swap_gank = True
-        elif swap_gank_str.lower() in ('no', 'n'):
-            swap_gank = False
-        else:
-            await ctx.send("El valor para 'swap de gank' debe ser 'si' o 'no'.")
-            return
+            await ctx.send("La IP mínima debe ser un número válido. Se usará el valor por defecto.")
+            final_ip_min = default_ip # Vuelve al defecto si es inválido
         
         caller_display = caller_display_name_or_none if caller_display_name_or_none else ctx.author.display_name
+        
+        current_event_time = datetime.now()
+        # Hora de salida: 15 minutos después de lanzado
+        departure_time = current_event_time + timedelta(minutes=15)
+        display_departure_time = departure_time.strftime("%H:%M")
+
 
         event_id = f"roaming-{int(time.time())}-{random.randint(1000, 9999)}"
 
@@ -482,16 +515,16 @@ class RoamingCog(commands.Cog):
             "caller_display": caller_display,
             "channel_id": ctx.channel.id,
             "party_name": party_name_lower,
-            "tier_min": tier_min,
-            "ip_min": ip_min,
-            "swap_gank": swap_gank,
+            "tier_min": final_tier_min, # Usar el valor final
+            "ip_min": final_ip_min,     # Usar el valor final
+            "swap_gank": final_swap_gank, # Usar el valor final
             "inscripciones": {rol: [] for rol in party_data["roles"]},
             "waitlist": {rol: [] for rol in party_data["roles"]}, # Lista de espera por rol
             "start_time": time.time(),
             "message_id": None,
             "thread_id": None,
             "thread_channel_id": None,
-            "time": datetime.now().strftime("%H:%M") # Hora actual para 'Hora de Salida' si no se especifica
+            "time": display_departure_time # Usar la hora calculada
         }
 
         # Enviar el @everyone primero
