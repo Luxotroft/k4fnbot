@@ -365,7 +365,7 @@ class RoamingView(discord.ui.View):
         else:
             await interaction.followup.send("No estabas inscrito en ningún rol o lista de espera para este roaming.", ephemeral=True)
 
-    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="roaming_close_button")
+    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="-", custom_id="roaming_close_button")
     async def close_roaming(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.caller_id:
             await interaction.response.send_message("❌ Solo el creador del evento puede cerrarlo.", ephemeral=True)
