@@ -182,7 +182,7 @@ def create_roaming_embed(party, event_data):
         if len(inscritos) > 3:
             jugadores += f" (+{len(inscritos)-3} más)"
 
-        linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '🚫'}"
+        linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '-'}"
         if waitlist_players:
             jugadores_espera = ' '.join(f'<@{uid}>' for uid in waitlist_players)
             linea += f" | ⏳ Espera: {jugadores_espera}"
