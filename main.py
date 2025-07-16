@@ -1279,43 +1279,80 @@ async def clear_priority_wb(ctx, event_id: int):
     else:
         await ctx.send(f"ℹ️ El evento WB ID: {event_id} no tenía prioridad activa.", ephemeral=True)
 
-# --- Comandos para Roaming Parties ---
-@bot.command(name="roaming")
-async def roaming_party(ctx, party_type: str, tier_min: str, ip_min: int, time_val: str = None, swap_gank: str = "no", *caller_name_args):
-    party_type = party_type.lower()
-    if party_type not in ROAMING_PARTIES:
-        return await ctx.send(f"❌ Tipo de roaming '{party_type}' no reconocido. Tipos disponibles: {', '.join(ROAMING_PARTIES.keys())}", ephemeral=True)
-    
-    caller_display = get_roaming_caller_info(ctx, caller_name_args)
-    swap_gank_bool = swap_gank.lower() in ('si', 'sí', 'y', 'yes')
+# --- Comandos de Prefijo para Roaming ---
+@bot.command(name='roaming', aliases=['r'])
+async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
+    """
+    Crea un evento de roaming con hora, swap de gank y caller opcionales.
+    Ej: !r kiteo1 T8 1400 3.30 si Pepito
+    Ej: !r kiteo1 T8 1400 no
+    Ej: !r brawl2 T8 1450 IsaelOC
+    """
+    party_lower = party.lower()
+    if party_lower not in ROAMING_PARTIES:
+        return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
 
-    event_id = int(time.time()) # Unique ID based on timestamp
+    # --- LÓGICA DE PARSEO FLEXIBLE DE ARGUMENTOS ---
+    # Inicializamos los valores opcionales
+    time_str = None
+    swap_gank_status = False
+    caller_display = ctx.author.display_name
     
-    # Initialize inscriptions and waitlist for each role in the selected party type
-    inscriptions = {role: [] for role in ROAMING_PARTIES[party_type]["roles"]}
-    waitlist = {role: [] for role in ROAMING_PARTIES[party_type]["roles"]}
+    # Procesamos los argumentos adicionales (*args)
+    # Creamos una lista temporal para manipular los argumentos
+    temp_args = list(args)
 
-    event_data = {
-        "party": party_type,
+    # 1. Buscar el flag de swap de gank ('si'/'no') de forma flexible
+    swap_keywords_si = ('si', 'sí', 'yes', 'y')
+    swap_keywords_no = ('no', 'n')
+    
+    found_swap_arg = False
+    for i, arg in enumerate(temp_args):
+        if arg.lower() in swap_keywords_si:
+            swap_gank_status = True
+            temp_args.pop(i)
+            found_swap_arg = True
+            break
+        elif arg.lower() in swap_keywords_no:
+            swap_gank_status = False # El valor por defecto, pero lo dejamos explícito
+            temp_args.pop(i)
+            found_swap_arg = True
+            break
+
+    # 2. Buscar el argumento de la hora (que parece un número flotante, ej: '3.30')
+    found_time_arg = False
+    for i, arg in enumerate(temp_args):
+        # Usamos regex para verificar si es un número flotante como '3.30'
+        if re.match(r'^\d+(\.\d+)?$', arg):
+            time_str = temp_args.pop(i)
+            found_time_arg = True
+            break
+            
+    # 3. Lo que queda es el nombre del caller (o nada)
+    if temp_args:
+        caller_display = ' '.join(temp_args) # Unimos el resto como el nombre del caller
+
+    event_id = f"{ctx.author.id}-{int(time.time())}"
+
+    # Inicializa el diccionario de inscripciones y la lista de espera
+    inscripciones_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
+    waitlist_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
+
+    # Crea la entrada en el diccionario global
+    roaming_events[event_id] = {
+        "event_id": event_id,
         "caller_id": ctx.author.id,
         "caller_display": caller_display,
-        "tier_min": tier_min,
-        "ip_min": ip_min,
-        "time": time_val,
-        "swap_gank": swap_gank_bool,
-        "inscripciones": inscriptions,
-        "waitlist": waitlist,
-        "event_id": event_id
-    }
-    
-    embed = create_roaming_embed(party_type, event_data)
-    message = await ctx.send(embed=embed)
-
-    roaming_events[event_id] = {
-        "message": message,
-        "caller_id": ctx.author.id,
-        "party": party_type,
-        "event_data": event_data # Store the full event data
+        "channel_id": ctx.channel.id,
+        "party": party_lower,
+        "tier_min": tier.upper(),
+        "ip_min": ip,
+        "time": time_str,  # <-- NUEVO CAMPO AÑADIDO
+        "swap_gank": swap_gank_status,  # <-- CAMPO ACTUALIZADO
+        "start_time": time.time(),
+        "message": None,
+        "inscripciones": inscripciones_dict,
+        "waitlist": waitlist_dict
     }
     
     view = RoamingRoleSelectorView(party_type, event_id, ctx.author.id)
