@@ -70,6 +70,10 @@ ROAMING_PARTIES = {
             "REDENCION": 1,
             "INFORTUNIO": 1,
         },
+        "mutually_exclusive_groups": [ # <--- FUNCIONALIDAD AÑADIDA
+            {"roles": ["LOCUS", "ENRAIZADO"], "max_slots": 1},
+            {"roles": ["TALLADA", "CAZAESPÍRITUS"], "max_slots": 1}
+        ],
         "emojis": {
             "GOLEM": "<:Terrunico:1290880192092438540>",
             "PESADA": "<:stoper:1290858463135662080>",
@@ -167,348 +171,508 @@ ROAMING_PARTIES = {
     }
 }
 
-roaming_events = {} # Diccionario para almacenar los eventos de roaming activos
-ROAMING_EVENT_TIMEOUT = 7200 # 2 horas
-
+roaming_events = {} # Diccionario para almacenar los eventos activos de roaming
 
 # ====================================================================
-# --- FUNCIONES HELPER DE ROAMING ---
+# --- 1. FUNCIÓN PARA CREAR EL EMBED DE ROAMING ---
 # ====================================================================
 
-def create_roaming_embed(party, event_data):
-    """Genera el mensaje embed para el evento de roaming."""
+def create_roaming_embed(party_name):
+    party = ROAMING_PARTIES.get(party_name)
+    if not party:
+        return None
+
+    title_map = {
+        "kiteo1": "Kiteo 1",
+        "kiteo2": "Kiteo 2",
+        "pocho": "POCHO",
+        "brawl": "Brawl",
+        "brawl2": "Brawl 2",
+        "brawl_gucci": "Brawl Gucci"
+    }
+
+    title = title_map.get(party_name, f"Evento de Roaming: {party_name.capitalize()}")
+    color = 0xFF0000 # Rojo
+    description = f"**{title}**\n\n"
+
+    total_roles = sum(party["roles"].values())
+    current_players = sum(len(players) for players in roaming_events.get(party_name, {}).get("inscripciones", {}).values())
+    
+    # Calcular el número de jugadores en la lista de espera
+    waitlist_count = len(roaming_events.get(party_name, {}).get("waitlist", []))
+
+    description += f"Jugadores inscritos: `{current_players}/{party['max_players']}`\n"
+    if waitlist_count > 0:
+        description += f"En lista de espera: `{waitlist_count}`\n"
+    description += "\n"
+
     embed = discord.Embed(
-        title=f"⚔️ ¡ROAMING DE {party.upper()} ABIERTO! ⚔️",
-        description="¡Anótate en el rol que mejor se adapte a ti!",
-        color=0x00ff00
+        title=title,
+        description=description,
+        color=color
     )
-    embed.set_thumbnail(url="https://assets.albiononline.com/assets/images/icons/faction_standings_lymhurst.png") # Ejemplo
 
-    # Campos para Roles y sus inscripciones
-    roles_str = []
-    total_inscritos = 0
+    inscripciones = roaming_events.get(party_name, {}).get("inscripciones", {})
+    waitlist = roaming_events.get(party_name, {}).get("waitlist", [])
 
-    # Asegurarse de que party es una clave válida en ROAMING_PARTIES
-    if party not in ROAMING_PARTIES:
-        return embed # O manejar el error de otra forma
-
-    for rol, max_count in ROAMING_PARTIES[party]["roles"].items():
-        inscritos = event_data["inscripciones"].get(rol, [])
-        waitlist_players = event_data["waitlist"].get(rol, [])
-        total_inscritos += len(inscritos)
-
-        emoji = ROAMING_PARTIES[party]["emojis"].get(rol, "❓") # Emoji predeterminado si no se encuentra
+    # Añadir los campos de roles con jugadores
+    for role, max_slots in party["roles"].items():
+        players = inscripciones.get(role, [])
+        player_names = [player["name"] for player in players]
         
-        jugadores_insc = ' '.join(f'<@{uid}>' for uid in inscritos)
-        if jugadores_insc:
-            linea = f"{emoji} **{rol.ljust(20)}** ({len(inscritos)}/{max_count}) → {jugadores_insc}"
+        emoji = party["emojis"].get(role, "❓") # Emoji genérico si no se encuentra uno específico
+        
+        # Formatear la lista de jugadores inscritos
+        if player_names:
+            players_str = "\n".join([f"- {name}" for name in player_names])
         else:
-            linea = f"{emoji} **{rol.ljust(20)}** ({len(inscritos)}/{max_count}) → —"
-        
-        if waitlist_players:
-            jugadores_wait = ' '.join(f'<@{uid}>' for uid in waitlist_players)
-            linea += f" | ⏳ Espera: {jugadores_wait}"
-        
-        roles_str.append(linea)
-
-    # Dividir los roles en múltiples campos si hay muchos
-    for i in range(0, len(roles_str), 10): # Mostrar 10 roles por campo
+            players_str = "Nadie"
+            
         embed.add_field(
-            name=f"🎮 ROLES DISPONIBLES ({total_inscritos}/{ROAMING_PARTIES[party]['max_players']} jugadores)" if i == 0 else "↳ Continuación",
-            value="\n".join(roles_str[i:i+10]),
+            name=f"{emoji} {role} (`{len(players)}/{max_slots}`)",
+            value=players_str,
+            inline=True
+        )
+
+    # Añadir la lista de espera si hay jugadores
+    if waitlist:
+        waitlist_names = [player["name"] for player in waitlist]
+        waitlist_str = "\n".join([f"- {name}" for name in waitlist_names])
+        embed.add_field(
+            name="⌛ Lista de Espera",
+            value=waitlist_str,
             inline=False
         )
     
-    # Campo para la lista de "Otros" si existe
-    otros_inscritos = event_data["inscripciones"].get("Otros", [])
-    if otros_inscritos:
-        embed.add_field(
-            name="👥 Otros Inscritos",
-            value=' '.join(f'<@{uid}>' for uid in otros_inscritos),
-            inline=False
-        )
+    embed.set_footer(text="Haz clic en un rol para inscribirte o cancelar tu inscripción.")
 
-    embed.set_footer(text=f"📊 {total_inscritos}/{ROAMING_PARTIES[party]['max_players']} jugadores | ID: {event_data['event_id']}")
-    embed.timestamp = datetime.utcnow()
     return embed
 
-async def update_roaming_embed(event_id, bot_instance):
-    """Actualiza el mensaje embed de un evento de roaming."""
-    if event_id not in roaming_events:
-        return
-    event = roaming_events[event_id]
-    message = event["message"]
-
-    if not message:
-        return
-    try:
-        embed = create_roaming_embed(event["party"], event)
-        view = RoamingEventView(event_id, event["caller_id"], bot_instance) # Pasa la instancia del bot
-        await message.edit(embed=embed, view=view)
-    except Exception as e:
-        print(f"Error actualizando embed para el evento {event_id}: {e}")
-
-
 # ====================================================================
-# --- CLASES DE UI (VIEWS, BUTTONS, SELECTS) PARA ROAMING ---
+# --- 2. VISTAS Y MENÚ DESPLEGABLE ---
 # ====================================================================
 
 class RoleDropdown(discord.ui.Select):
-    def __init__(self, party, event_id):
-        self.party = party
+    def __init__(self, party_name: str, event_id: str):
+        self.party_name = party_name
         self.event_id = event_id
+        party_data = ROAMING_PARTIES.get(party_name)
+        
         options = []
-        for role_name, _ in ROAMING_PARTIES[party]["roles"].items():
-            emoji_str = ROAMING_PARTIES[party]["emojis"].get(role_name, "❓")
-            options.append(discord.SelectOption(label=role_name, value=role_name, emoji=emoji_str))
-        
-        # Añadir la opción "Otros" para roles no listados específicamente
-        options.append(discord.SelectOption(label="Otros", value="Otros", emoji="👤"))
+        if party_data:
+            for role_name, _ in party_data["roles"].items():
+                emoji = party_data["emojis"].get(role_name, "❓")
+                options.append(discord.SelectOption(label=role_name, emoji=emoji))
 
-        super().__init__(
-            placeholder="Elige tu rol...",
-            min_values=1,
-            max_values=1,
-            options=options,
-            row=0
-        )
+        super().__init__(placeholder="Selecciona tu rol...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        if self.event_id not in roaming_events:
-            await interaction.response.send_message("❌ Este evento de roaming ya no está activo.", ephemeral=True)
-            return
+        await interaction.response.defer(ephemeral=True) # Defer para evitar timeout y ocultar mensaje
 
+        user = interaction.user
         selected_role = self.values[0]
-        user_id = interaction.user.id
-        event_data = roaming_events[self.event_id]
+        event = roaming_events.get(self.event_id)
+        party_data = ROAMING_PARTIES.get(self.party_name)
 
-        # Eliminar al usuario de todos los roles de este evento antes de añadirlo
-        for role_name in list(ROAMING_PARTIES[self.party]["roles"].keys()) + ["Otros"]:
-            if user_id in event_data["inscripciones"].get(role_name, []):
-                event_data["inscripciones"][role_name].remove(user_id)
-            if user_id in event_data["waitlist"].get(role_name, []):
-                event_data["waitlist"][role_name].remove(user_id)
+        if not event or not party_data:
+            await interaction.followup.send("Este evento de roaming ya no existe o es inválido.", ephemeral=True)
+            return
+
+        inscripciones = event.get("inscripciones", {})
+        waitlist = event.get("waitlist", [])
         
-        # Añadir al usuario al rol seleccionado o a la lista de espera
-        inscripciones_rol = event_data["inscripciones"].setdefault(selected_role, [])
-        max_players_for_role = ROAMING_PARTIES[self.party]["roles"].get(selected_role, 999) # 999 si es "Otros" o no tiene límite definido
+        # Variables para verificar si el usuario ya está en alguna inscripción o lista de espera
+        user_already_in_any_role = False
+        user_current_role = None
+
+        # Verificar si el usuario ya está inscrito en algún rol
+        for role, players in inscripciones.items():
+            if any(p["id"] == user.id for p in players):
+                user_already_in_any_role = True
+                user_current_role = role
+                break
         
-        if user_id not in inscripciones_rol:
-            if len(inscripciones_rol) < max_players_for_role:
-                inscripciones_rol.append(user_id)
-                await interaction.response.send_message(f"✅ Te has inscrito como **{selected_role}**.", ephemeral=True)
+        # Si el usuario no está inscrito, verificar si está en lista de espera
+        if not user_already_in_any_role:
+            if any(p["id"] == user.id for p in waitlist):
+                user_already_in_any_role = True
+                user_current_role = "waitlist" # Marcador para indicar que está en waitlist
+
+        # --- Lógica para roles mutuamente excluyentes ---
+        is_mutually_exclusive_role = False
+        mutually_exclusive_group = None
+        group_max_slots = 0
+
+        if "mutually_exclusive_groups" in party_data:
+            for group in party_data["mutually_exclusive_groups"]:
+                if selected_role in group["roles"]:
+                    is_mutually_exclusive_role = True
+                    mutually_exclusive_group = group["roles"]
+                    group_max_slots = group["max_slots"]
+                    break
+
+        if user_already_in_any_role:
+            if user_current_role == selected_role:
+                # El usuario quiere cancelar su rol actual
+                if selected_role in inscripciones and any(p["id"] == user.id for p in inscripciones[selected_role]):
+                    inscripciones[selected_role] = [p for p in inscripciones[selected_role] if p["id"] != user.id]
+                    
+                    # Intentar mover de la lista de espera si hay un slot disponible
+                    if not is_mutually_exclusive_role: # Para roles no exclusivos, solo rellenar si hay espacio
+                        while len(inscripciones.get(selected_role, [])) < party_data["roles"][selected_role] and waitlist:
+                            next_player_in_waitlist = waitlist.pop(0)
+                            inscripciones.setdefault(selected_role, []).append({"id": next_player_in_waitlist["id"], "name": next_player_in_waitlist["name"]})
+                            await interaction.followup.send(f"<@{next_player_in_waitlist['id']}>, ¡has sido movido al rol **{selected_role}**!", ephemeral=False)
+                    else: # Para roles mutuamente excluyentes
+                        # Recalcular ocupación del grupo después de que el usuario se ha salido
+                        current_group_occupancy_after_user_cleared = 0
+                        for role_in_group in mutually_exclusive_group:
+                            if role_in_group in inscripciones:
+                                current_group_occupancy_after_user_cleared += len(inscripciones[role_in_group])
+                        
+                        # Si hay un slot disponible en el grupo, intentar mover a alguien de la lista de espera general
+                        if current_group_occupancy_after_user_cleared < group_max_slots:
+                            # Buscar a alguien en la waitlist que esté esperando por un rol en este grupo exclusivo
+                            moved_from_waitlist = False
+                            for i, p in enumerate(waitlist):
+                                if p["desired_role"] in mutually_exclusive_group:
+                                    inscripciones.setdefault(p["desired_role"], []).append({"id": p["id"], "name": p["name"]})
+                                    await interaction.followup.send(f"<@{p['id']}>, ¡has sido movido al rol **{p['desired_role']}**!", ephemeral=False)
+                                    waitlist.pop(i) # Eliminar de la lista de espera
+                                    moved_from_waitlist = True
+                                    break
+                            
+                            # Si no se movió a nadie específico del grupo, entonces se queda el slot libre
+                            # y el siguiente en la waitlist general podría no ser para este slot
+                            # Dejar la lógica simple, si se libera slot exclusivo, notificar.
+                            if not moved_from_waitlist and current_group_occupancy_after_user_cleared < group_max_slots:
+                                pass # El slot exclusivo está libre, pero nadie en waitlist lo pidió específicamente
+
+                    await interaction.followup.send(f"Has cancelado tu inscripción en **{selected_role}**.", ephemeral=True)
+                else: # Estaba en lista de espera para el rol actual o no existía su inscripción
+                    if user_current_role == "waitlist" and any(p["id"] == user.id and p["desired_role"] == selected_role for p in waitlist):
+                        # Remover de la lista de espera si seleccionó su propio rol de espera
+                        waitlist[:] = [p for p in waitlist if not (p["id"] == user.id and p["desired_role"] == selected_role)]
+                        await interaction.followup.send(f"Has cancelado tu inscripción en la lista de espera para **{selected_role}**.", ephemeral=True)
+                    else:
+                        await interaction.followup.send(f"Ya estás inscrito en **{user_current_role}** o en lista de espera. Si deseas cambiar de rol, primero cancela tu rol actual usando el menú.", ephemeral=True)
             else:
-                # Si el rol está lleno, añadir a la lista de espera
-                waitlist_rol = event_data["waitlist"].setdefault(selected_role, [])
-                if user_id not in waitlist_rol:
-                    waitlist_rol.append(user_id)
-                    await interaction.response.send_message(f"⚠️ El rol de **{selected_role}** está lleno. Te hemos añadido a la lista de espera.", ephemeral=True)
+                # El usuario quiere cambiar de rol (ya está inscrito en otro o en lista de espera por otro)
+                await interaction.followup.send(f"Ya estás inscrito en **{user_current_role}**. Para cambiar, primero cancela tu inscripción actual en ese rol.", ephemeral=True)
+        else: # El usuario NO está inscrito en ningún rol ni en lista de espera
+            max_slots_for_role = party_data["roles"].get(selected_role)
+            current_occupancy = len(inscripciones.get(selected_role, []))
+
+            if is_mutually_exclusive_role:
+                # Comprobar la ocupación del grupo exclusivo
+                current_group_occupancy = 0
+                for role_in_group in mutually_exclusive_group:
+                    if role_in_group in inscripciones:
+                        current_group_occupancy += len(inscripciones[role_in_group])
+
+                if current_group_occupancy < group_max_slots:
+                    # Hay espacio en el grupo exclusivo, se puede inscribir
+                    inscripciones.setdefault(selected_role, []).append({"id": user.id, "name": user.display_name})
+                    await interaction.followup.send(f"¡Te has inscrito en **{selected_role}**!", ephemeral=True)
                 else:
-                    await interaction.response.send_message(f"ℹ️ Ya estás en la lista de espera para **{selected_role}**.", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"ℹ️ Ya estás inscrito como **{selected_role}**.", ephemeral=True)
+                    # El grupo exclusivo está lleno, añadir a lista de espera
+                    waitlist.append({"id": user.id, "name": user.display_name, "desired_role": selected_role})
+                    await interaction.followup.send(f"**{selected_role}** está lleno (o su rol relacionado). Has sido añadido/a a la lista de espera.", ephemeral=True)
+            else: # Rol no mutuamente excluyente, lógica normal
+                if current_occupancy < max_slots_for_role:
+                    inscripciones.setdefault(selected_role, []).append({"id": user.id, "name": user.display_name})
+                    await interaction.followup.send(f"¡Te has inscrito en **{selected_role}**!", ephemeral=True)
+                else:
+                    waitlist.append({"id": user.id, "name": user.display_name, "desired_role": selected_role})
+                    await interaction.followup.send(f"**{selected_role}** está lleno. Has sido añadido/a a la lista de espera.", ephemeral=True)
         
-        await update_roaming_embed(self.event_id, self.view.bot_instance) # Pasa la instancia del bot desde la vista
+        # Guardar los cambios
+        event["inscripciones"] = inscripciones
+        event["waitlist"] = waitlist
+        roaming_events[self.event_id] = event
 
-
-class LeaveButton(discord.ui.Button):
-    def __init__(self, event_id):
-        super().__init__(label="Salirme", style=discord.ButtonStyle.red, emoji="👋", row=1)
-        self.event_id = event_id
-
-    async def callback(self, interaction: discord.Interaction):
-        if self.event_id not in roaming_events:
-            await interaction.response.send_message("❌ Este evento de roaming ya no está activo.", ephemeral=True)
-            return
-
-        user_id = interaction.user.id
-        event_data = roaming_events[self.event_id]
-        found = False
-
-        # Buscar y eliminar al usuario de inscripciones o lista de espera
-        for role_name in list(ROAMING_PARTIES[event_data["party"]]["roles"].keys()) + ["Otros"]:
-            if user_id in event_data["inscripciones"].get(role_name, []):
-                event_data["inscripciones"][role_name].remove(user_id)
-                found = True
-                break
-            if user_id in event_data["waitlist"].get(role_name, []):
-                event_data["waitlist"][role_name].remove(user_id)
-                found = True
-                break
-        
-        if found:
-            await interaction.response.send_message("✅ Te has salido del evento de roaming.", ephemeral=True)
-            await update_roaming_embed(self.event_id, self.view.bot_instance) # Pasa la instancia del bot
-        else:
-            await interaction.response.send_message("ℹ️ No estabas inscrito en este evento de roaming.", ephemeral=True)
-
-
-class RoamingEventView(discord.ui.View):
-    def __init__(self, event_id, caller_id, bot_instance):
-        super().__init__(timeout=None)
-        self.caller_id = caller_id
-        self.event_id = event_id
-        self.bot_instance = bot_instance # Guardar la instancia del bot
-        
-        # Asegurarse de que el party existe en roaming_events antes de intentar acceder a él
-        if event_id in roaming_events:
-            party_type = roaming_events[event_id]["party"]
-            self.add_item(RoleDropdown(party_type, event_id))
-        else:
-            # Si el evento no existe, no añadir el dropdown o manejar el error
-            print(f"Error: No se encontró el evento {event_id} al crear la vista.")
-
-        self.add_item(LeaveButton(event_id))
-
-    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", row=2)
-    async def close_event_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.caller_id:
-            await interaction.response.send_message("❌ Solo el que lanzó el evento puede cerrarlo.", ephemeral=True)
-            return
-
-        if self.event_id not in roaming_events:
-            await interaction.response.send_message("❌ Este evento de roaming ya no está activo.", ephemeral=True)
-            return
-
-        thread = interaction.message.thread
-        if thread:
-            try:
-                if thread.archived:
-                    await thread.edit(archived=False, reason="Desarchivando para eliminar")
-                await thread.delete()
-                print(f"Hilo del evento Roaming {self.event_id} eliminado correctamente.")
-            except discord.NotFound:
-                print(f"El hilo del evento Roaming {self.event_id} ya no existe.")
-            except discord.Forbidden:
-                print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento Roaming {self.event_id}.")
-            except Exception as e:
-                print(f"Error inesperado al eliminar el hilo del evento Roaming {self.event_id}: {e}")
-        else:
-            print("No se encontró un hilo asociado al mensaje del evento Roaming.")
-
-        try:
-            await interaction.message.delete()
-            del roaming_events[self.event_id]
-            await interaction.response.send_message("✅ Evento de roaming cerrado y mensaje eliminado.", ephemeral=True)
-        except discord.NotFound:
-            print(f"Mensaje del evento Roaming {self.event_id} ya eliminado.")
-        except Exception as e:
-            print(f"Error al eliminar el mensaje del evento Roaming {self.event_id}: {e}")
-
-    @discord.ui.button(label="Resetear Inscripciones", style=discord.ButtonStyle.secondary, emoji="♻️", row=2)
-    async def reset_inscriptions_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.caller_id:
-            await interaction.response.send_message("❌ Solo el que lanzó el evento puede resetear las inscripciones.", ephemeral=True)
-            return
-
-        if self.event_id not in roaming_events:
-            await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
-            return
-        
-        event_data = roaming_events[self.event_id]
-        party_type = event_data["party"]
-        event_data["inscripciones"] = {rol: [] for rol in ROAMING_PARTIES[party_type]["roles"].keys()}
-        event_data["inscripciones"]["Otros"] = [] # Asegurarse de resetear también "Otros"
-        event_data["waitlist"] = {rol: [] for rol in ROAMING_PARTIES[party_type]["roles"].keys()}
-        event_data["waitlist"]["Otros"] = []
-
-        await update_roaming_embed(self.event_id, self.bot_instance)
-        await interaction.response.send_message("✅ Se han reseteado todas las inscripciones y listas de espera del evento.", ephemeral=True)
-
+        # Actualizar el embed original del mensaje
+        original_message = interaction.message
+        updated_embed = create_roaming_embed(self.party_name)
+        if updated_embed:
+            await original_message.edit(embed=updated_embed, view=RoleView(self.party_name, self.event_id))
 
 # ====================================================================
-# --- COG DE ROAMING ---
+# --- 3. VISTA CON EL MENÚ DESPLEGABLE ---
+# ====================================================================
+
+class RoleView(discord.ui.View):
+    def __init__(self, party_name: str, event_id: str, timeout=None):
+        super().__init__(timeout=timeout)
+        self.add_item(RoleDropdown(party_name, event_id))
+
+# ====================================================================
+# --- 4. COG DE ROAMING ---
 # ====================================================================
 
 class RoamingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.cleanup_roaming_events.start()
+        print("✅ Módulo Roaming cargado (comandos !roaming, !roster, !cancel, !add, !remove)")
 
     def cog_unload(self):
         self.cleanup_roaming_events.cancel()
 
-    @commands.command(name="roaming")
-    async def roaming(self, ctx, party: str):
-        party_lower = party.lower()
-        if party_lower not in ROAMING_PARTIES:
-            available_parties = ", ".join(ROAMING_PARTIES.keys())
-            await ctx.send(f"❌ Tipo de roaming inválido. Opciones disponibles: {available_parties}")
+    @commands.command(name='roaming', help='Inicia un evento de roaming. Uso: !roaming <nombre_party> <@rol_a_notificar> [duración_horas (defecto: 1h)]')
+    async def start_roaming_event(self, ctx, party_name: str, role_to_notify: discord.Role = None, duration_hours: float = 1.0):
+        if party_name not in ROAMING_PARTIES:
+            await ctx.send(f"Party '{party_name}' no encontrada. Parties disponibles: {', '.join(ROAMING_PARTIES.keys())}")
             return
 
-        # Generar un ID único para el evento de roaming
-        event_id = f"{party_lower}-{random.randint(1000, 9999)}"
-        while event_id in roaming_events: # Asegurarse de que el ID no esté ya en uso
-            event_id = f"{party_lower}-{random.randint(1000, 9999)}"
-
-        # Inicializar los datos del evento
-        event_data = {
-            "caller_id": ctx.author.id,
-            "channel_id": ctx.channel.id,
-            "thread_id": None, # Se llenará si se crea un hilo
-            "message_id": None, # Se llenará después de enviar el mensaje
-            "party": party_lower,
-            "inscripciones": {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"].keys()},
-            "waitlist": {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"].keys()},
-            "creation_time": datetime.utcnow(),
-            "last_updated": datetime.utcnow()
-        }
-        event_data["event_id"] = event_id # AÑADIDO: Asegura que event_id esté en event_data
-        roaming_events[event_id] = event_data # Almacenar el evento
-
-
-        embed = create_roaming_embed(party_lower, event_data) # Pasa los datos del evento
-        view = RoamingEventView(event_id, ctx.author.id, self.bot) # Pasa la instancia del bot
+        event_id = str(time.time()) # Usar timestamp como ID único para el evento
         
+        # Calcular el tiempo de expiración
+        expiration_time = datetime.now() + timedelta(hours=duration_hours)
+        
+        # Crear el embed y la vista
+        embed = create_roaming_embed(party_name)
+        if not embed:
+            await ctx.send("Error al crear el embed del evento.")
+            return
+        
+        view = RoleView(party_name, event_id, timeout=duration_hours * 3600) # El timeout de la vista debe ser en segundos
+
+        # Enviar el mensaje inicial
+        message = await ctx.send(embed=embed, view=view)
+
+        # Si se especificó un rol, enviarlo en un mensaje separado para la notificación
+        if role_to_notify:
+            await ctx.send(f"{role_to_notify.mention} ¡Un evento de roaming ha comenzado! Revisa el mensaje de arriba para inscribirte.", delete_after=30)
+
+
+        # Guardar el estado del evento
+        roaming_events[event_id] = {
+            "channel_id": ctx.channel.id,
+            "message_id": message.id,
+            "thread_id": None, # Se asignará si se crea un hilo
+            "party_name": party_name,
+            "inscripciones": {},
+            "waitlist": [],
+            "timestamp": expiration_time.timestamp() # Guardar como timestamp para fácil comparación
+        }
+
+        # Crear un hilo para el evento
         try:
-            message = await ctx.send(embed=embed, view=view)
-            event_data["message_id"] = message.id
-            event_data["message"] = message # Almacenar el objeto mensaje para futuras ediciones
-            
-            # Crear un hilo asociado al mensaje si el canal lo permite
-            if isinstance(ctx.channel, discord.TextChannel):
-                thread = await message.create_thread(name=f"Roaming - {party.upper()}", auto_archive_duration=60)
-                event_data["thread_id"] = thread.id
-                await thread.send(f"¡Hilo de discusión para el roaming de {party.upper()}! <@{ctx.author.id}>", silent=True)
+            thread = await message.create_thread(name=f"Roaming - {party_name}", auto_archive_duration=60)
+            roaming_events[event_id]["thread_id"] = thread.id
+            await thread.send(f"¡Bienvenido al hilo del evento de {party_name}! Usa este hilo para coordinar o preguntar.")
+        except discord.Forbidden:
+            print(f"No tengo permisos para crear hilos en el canal {ctx.channel.name} ({ctx.channel.id}).")
         except Exception as e:
-            print(f"Error al enviar mensaje o crear hilo para Roaming: {e}")
-            await ctx.send("❌ Hubo un error al crear el evento de roaming. Intenta de nuevo más tarde.")
-            if event_id in roaming_events: # Si falló al enviar el mensaje, limpiar el evento
-                del roaming_events[event_id]
+            print(f"Error al crear hilo para evento de roaming: {e}")
+
+        await ctx.send(f"Evento de roaming '{party_name}' creado con éxito. Durará {duration_hours} hora(s).", delete_after=10)
+
+
+    @commands.command(name='roster', help='Muestra el roster actual de un evento de roaming.')
+    async def show_roster(self, ctx, event_id: str):
+        event = roaming_events.get(event_id)
+        if not event:
+            await ctx.send("Evento de roaming no encontrado. Asegúrate de usar el ID correcto.")
             return
 
-        # Intentar borrar el mensaje de invocación del comando para mantener el canal limpio
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            print("No tengo permisos para borrar el mensaje del comando original.")
-        except discord.NotFound:
-            pass # El mensaje ya fue borrado
+        party_name = event["party_name"]
+        embed = create_roaming_embed(party_name) # Reutilizar la función para mostrar el estado actual
+        if embed:
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("Error al obtener la información del roster.")
 
-    @tasks.loop(seconds=60)
+    @commands.command(name='cancelroaming', help='Cancela un evento de roaming activo. Uso: !cancelroaming <event_id>')
+    async def cancel_roaming_event(self, ctx, event_id: str):
+        if event_id in roaming_events:
+            try:
+                event_data = roaming_events[event_id]
+                channel = self.bot.get_channel(event_data["channel_id"])
+                if channel:
+                    message = await channel.fetch_message(event_data["message_id"])
+                    
+                    if message.thread:
+                        if not message.thread.archived:
+                            await message.thread.edit(archived=True, reason="Evento de Roaming Cancelado")
+                        await message.thread.delete() # Eliminar el hilo
+                    
+                    await message.delete() # Eliminar el mensaje principal
+                
+                del roaming_events[event_id]
+                await ctx.send(f"Evento de roaming `{event_id}` cancelado y eliminado con éxito.")
+            except discord.NotFound:
+                await ctx.send(f"Mensaje o hilo del evento `{event_id}` no encontrado en Discord, pero el evento ha sido eliminado internamente.")
+                del roaming_events[event_id] # Asegurarse de eliminarlo del diccionario
+            except discord.Forbidden:
+                await ctx.send("No tengo permisos para eliminar mensajes o hilos. Por favor, elimina el mensaje del evento manualmente.")
+            except Exception as e:
+                await ctx.send(f"Ocurrió un error al intentar cancelar el evento: {e}")
+                print(f"Error al cancelar evento de roaming {event_id}: {e}")
+        else:
+            await ctx.send(f"No se encontró ningún evento de roaming con el ID `{event_id}`.")
+
+    @commands.command(name='addplayer', help='Añade un jugador a un rol de un evento de roaming. Uso: !addplayer <event_id> <@usuario> <rol>')
+    @commands.has_permissions(manage_roles=True) # Requiere permisos para gestionar roles
+    async def add_player_to_roaming(self, ctx, event_id: str, member: discord.Member, role: str):
+        event = roaming_events.get(event_id)
+        if not event:
+            await ctx.send("Evento de roaming no encontrado.")
+            return
+
+        party_data = ROAMING_PARTIES.get(event["party_name"])
+        if not party_data or role not in party_data["roles"]:
+            await ctx.send(f"El rol '{role}' no es válido para la party '{event['party_name']}'.")
+            return
+
+        inscripciones = event["inscripciones"]
+        max_slots = party_data["roles"][role]
+
+        # Verificar si el usuario ya está en algún rol
+        for r, players in inscripciones.items():
+            if any(p["id"] == member.id for p in players):
+                await ctx.send(f"{member.display_name} ya está inscrito en el rol {r}.")
+                return
+        
+        # Verificar si el rol ya está lleno (considerando grupos exclusivos)
+        is_mutually_exclusive_role = False
+        if "mutually_exclusive_groups" in party_data:
+            for group in party_data["mutually_exclusive_groups"]:
+                if role in group["roles"]:
+                    is_mutually_exclusive_role = True
+                    group_max_slots = group["max_slots"]
+                    
+                    current_group_occupancy = 0
+                    for role_in_group in group["roles"]:
+                        current_group_occupancy += len(inscripciones.get(role_in_group, []))
+                    
+                    if current_group_occupancy >= group_max_slots:
+                        await ctx.send(f"No se puede añadir a {member.display_name} a '{role}'. El grupo de roles mutuamente excluyentes para este rol ya está lleno.")
+                        return
+                    break
+
+        if not is_mutually_exclusive_role and len(inscripciones.get(role, [])) >= max_slots:
+            await ctx.send(f"El rol '{role}' ya está lleno.")
+            return
+
+        inscripciones.setdefault(role, []).append({"id": member.id, "name": member.display_name})
+        
+        # Eliminar de la lista de espera si estaba allí
+        event["waitlist"][:] = [p for p in event["waitlist"] if p["id"] != member.id]
+
+        # Actualizar el mensaje
+        channel = self.bot.get_channel(event["channel_id"])
+        if channel:
+            message = await channel.fetch_message(event["message_id"])
+            updated_embed = create_roaming_embed(event["party_name"])
+            if updated_embed:
+                await message.edit(embed=updated_embed, view=RoleView(event["party_name"], event_id))
+        
+        await ctx.send(f"✅ {member.display_name} ha sido añadido a {role} para el evento `{event_id}`.")
+
+
+    @commands.command(name='removeplayer', help='Elimina un jugador de un rol de un evento de roaming. Uso: !removeplayer <event_id> <@usuario>')
+    @commands.has_permissions(manage_roles=True) # Requiere permisos para gestionar roles
+    async def remove_player_from_roaming(self, ctx, event_id: str, member: discord.Member):
+        event = roaming_events.get(event_id)
+        if not event:
+            await ctx.send("Evento de roaming no encontrado.")
+            return
+
+        inscripciones = event["inscripciones"]
+        user_removed = False
+        role_of_removed_user = None
+
+        # Intentar remover de los roles inscritos
+        for role, players in inscripciones.items():
+            if any(p["id"] == member.id for p in players):
+                inscripciones[role] = [p for p in players if p["id"] != member.id]
+                user_removed = True
+                role_of_removed_user = role
+                break
+        
+        # Si no estaba en un rol, intentar remover de la lista de espera
+        if not user_removed:
+            if any(p["id"] == member.id for p in event["waitlist"]):
+                event["waitlist"][:] = [p for p in event["waitlist"] if p["id"] != member.id]
+                user_removed = True
+                role_of_removed_user = "la lista de espera"
+
+        if user_removed:
+            # Lógica para rellenar el slot si se liberó uno
+            if role_of_removed_user and role_of_removed_user != "la lista de espera":
+                party_data = ROAMING_PARTIES.get(event["party_name"])
+                if party_data:
+                    is_mutually_exclusive_role = False
+                    mutually_exclusive_group = None
+                    group_max_slots = 0
+
+                    if "mutually_exclusive_groups" in party_data:
+                        for group in party_data["mutually_exclusive_groups"]:
+                            if role_of_removed_user in group["roles"]:
+                                is_mutually_exclusive_role = True
+                                mutually_exclusive_group = group["roles"]
+                                group_max_slots = group["max_slots"]
+                                break
+
+                    if is_mutually_exclusive_role:
+                        current_group_occupancy_after_removal = 0
+                        for r_in_group in mutually_exclusive_group:
+                            current_group_occupancy_after_removal += len(inscripciones.get(r_in_group, []))
+
+                        if current_group_occupancy_after_removal < group_max_slots:
+                            # Intentar mover de la lista de espera para este grupo exclusivo
+                            moved_from_waitlist = False
+                            for i, p in enumerate(event["waitlist"]):
+                                if p["desired_role"] in mutually_exclusive_group:
+                                    inscripciones.setdefault(p["desired_role"], []).append({"id": p["id"], "name": p["name"]})
+                                    await ctx.send(f"<@{p['id']}>, ¡has sido movido al rol **{p['desired_role']}**!", ephemeral=False)
+                                    event["waitlist"].pop(i)
+                                    moved_from_waitlist = True
+                                    break
+                            if not moved_from_waitlist: # Si nadie específico del grupo, el slot está libre
+                                pass # No se necesita acción específica, el slot se mostrará como libre
+                    else: # Rol no exclusivo
+                        while len(inscripciones.get(role_of_removed_user, [])) < party_data["roles"][role_of_removed_user] and event["waitlist"]:
+                            next_player_in_waitlist = event["waitlist"].pop(0)
+                            inscripciones.setdefault(role_of_removed_user, []).append({"id": next_player_in_waitlist["id"], "name": next_player_in_waitlist["name"]})
+                            await ctx.send(f"<@{next_player_in_waitlist['id']}>, ¡has sido movido al rol **{role_of_removed_user}**!", ephemeral=False)
+
+            # Actualizar el mensaje
+            channel = self.bot.get_channel(event["channel_id"])
+            if channel:
+                message = await channel.fetch_message(event["message_id"])
+                updated_embed = create_roaming_embed(event["party_name"])
+                if updated_embed:
+                    await message.edit(embed=updated_embed, view=RoleView(event["party_name"], event_id))
+            
+            await ctx.send(f"✅ {member.display_name} ha sido eliminado/a de {role_of_removed_user} para el evento `{event_id}`.")
+        else:
+            await ctx.send(f"{member.display_name} no se encontró en ningún rol o en la lista de espera para el evento `{event_id}`.")
+
+    # Tarea en segundo plano para limpiar eventos expirados
+    @tasks.loop(minutes=5)
     async def cleanup_roaming_events(self):
-        """Tarea para limpiar eventos de roaming caducados."""
+        print("Ejecutando tarea de limpieza de eventos de roaming...")
+        current_time = time.time()
         events_to_remove = []
-        current_time = datetime.utcnow()
 
-        for event_id, event_data in list(roaming_events.items()): # Usar list() para permitir la eliminación durante la iteración
-            creation_time = event_data.get("creation_time")
-            message_id = event_data.get("message_id")
-            channel_id = event_data.get("channel_id")
-
-            # Si faltan datos críticos, marcar para eliminación
-            if not creation_time or not message_id or not channel_id:
-                print(f"Evento Roaming {event_id} incompleto, marcando para eliminación.")
+        for event_id, event_data in list(roaming_events.items()):
+            if "timestamp" not in event_data:
+                print(f"Evento {event_id} sin timestamp, marcando para eliminación.")
                 events_to_remove.append(event_id)
                 continue
 
-            # Si el evento ha excedido el tiempo de vida
-            if (current_time - creation_time).total_seconds() > ROAMING_EVENT_TIMEOUT:
+            if current_time > event_data["timestamp"]:
+                print(f"Evento de roaming {event_id} ha expirado. Eliminando...")
                 try:
+                    channel_id = event_data["channel_id"]
+                    message_id = event_data["message_id"]
+                    
                     channel = self.bot.get_channel(channel_id)
                     if not channel:
-                        print(f"Canal {channel_id} no encontrado para el evento Roaming {event_id}.")
-                        events_to_remove.append(event_id)
+                        print(f"Canal {channel_id} no encontrado para el evento {event_id}.")
                         continue
 
                     message = await channel.fetch_message(message_id)
