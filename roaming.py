@@ -1,15 +1,9 @@
 import discord
-from discord.ext import commands, tasks
-from datetime import datetime, timedelta
+from discord.ext import commands
 import asyncio
-import time
-import random
-import re
+from datetime import datetime, timedelta
 
-# ====================================================================
-# --- DATOS Y VARIABLES GLOBALES DE ROAMING ---
-# ====================================================================
-
+# --- Configuración de las composiciones de Roaming ---
 ROAMING_PARTIES = {
     "kiteo1": {
         "max_players": 20,
@@ -29,7 +23,8 @@ ROAMING_PARTIES = {
             "FISURANTE": "<:Fisurante:1337862459008090112>", "PRISMA": "<:Prisma:1367151400672559184>",
             "PUAS": "<:Puas:1291468593506029638>", "SANTI": "<:Santificador:1290858870260109384>",
             "FORJACORTEZA": "<:Infortunio:1290858784528531537>",
-        }
+        },
+        "default_params": {"tier": "8", "ip": "1450", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     },
     "kiteo2": {
         "max_players": 20,
@@ -47,22 +42,25 @@ ROAMING_PARTIES = {
             "PUTREFACTO": "<:Putrefacto:1370577320171016202>", "OCULTO": "<:Oculto:1337862058779218026>", "WITCHWORD": "<:witchword:1392942341815533758>",
             "FISURANTE": "<:Fisurante:1337862459008090112>", "PRISMA": "<:Prisma:1367151400672559184>", "FORJACORTEZA": "<:Infortunio:1290858784528531537>",
             "SANTI": "<:Santificador:1290858870260109384>", "TORRE_MOVIL": "<:MonturaMana:1337863658859925676>",
-        }
+        },
+        "default_params": {"tier": "8", "ip": "1450", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     },
     "pocho": {
         "max_players": 22,
         "roles": {
-            "GOLEM": 1, "PESADA": 2, "MARTILLO 1 H": 1, "JURADORES": 1, "LIFECURSED": 1, "LOCUS": 1,
-            "ENRAIZADO": 1, "GARZA": 1, "TALLADA": 1, "CAZAESPÍRITUS": 1, "DAMNATION": 1,
-            "ROMPERREINOS": 1, "DEMONFANG": 2, "GUADAÑA": 1, "INFERNALES": 2, "GRAN BASTON SAGRADO": 2,
-            "REDENCION": 1, "INFORTUNIO": 1,
+            "GOLEM": 1, "PESADA": 2, "MARTILLO 1 H": 1, "JURADORES": 1, "LIFECURSED": 1,
+            "LOCUS": 1, "ENRAIZADO": 1, # Estos dos son mutuamente excluyentes, el código lo manejará
+            "GARZA": 1,
+            "TALLADA": 1, "CAZAESPÍRITUS": 1, # Estos dos son mutuamente excluyentes, el código lo manejará
+            "DAMNATION": 1, "ROMPERREINOS": 1, "DEMONFANG": 2, "GUADAÑA": 1, "INFERNALES": 2,
+            "GRAN BASTON SAGRADO": 2, "REDENCION": 1, "INFORTUNIO": 1,
         },
         "emojis": {
             "GOLEM": "<:Terrunico:1290880192092438540>", "PESADA": "<:stoper:1290858463135662080>",
             "MARTILLO 1 H": "<:stoper:1290858463135662080>", "JURADORES": "<:Maracas:1290858583965175828>",
             "LIFECURSED": "<:Maldi:1291467716229730415>", "LOCUS": "<:Locus:1291467422238249043>",
             "ENRAIZADO": "<:Enraizado:1290879541073678397>", "GARZA": "<:Garza:1334558585325228032>",
-            "TALLADA": "<:Tallada:1290881286092886172>", "CAZAESPÍRITUS": "<:Cazaespiritu:1290881433816137821>",
+            "TALLADA": "<:Tallada:1290881286092886172>", "CAZAESPIRITUS": "<:Cazaespiritu:1290881433816137821>",
             "DAMNATION": "<:Maldiciones:1337862954820829294>", "ROMPERREINOS": "<:RompeReino:1290881352182399017>",
             "DEMONFANG": "<:Colmillo:1370577697516032031>", "GUADAÑA": "<:Guadaa:1291468660917014538>",
             "INFERNALES": "<:Infernales:1334556778465198163>", "GRAN BASTON SAGRADO": "<:gransagrado:1395086071275982848>",
@@ -71,7 +69,8 @@ ROAMING_PARTIES = {
         "mutually_exclusive_groups": [
             {"roles": ["LOCUS", "ENRAIZADO"]},
             {"roles": ["TALLADA", "CAZAESPÍRITUS"]}
-        ]
+        ],
+        "default_params": {"tier": "4.2", "ip": "1200", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     },
     "brawl": {
         "max_players": 20,
@@ -86,7 +85,8 @@ ROAMING_PARTIES = {
             "INFORTUNIO": "<:Infortunio:1290858784528531537>", "ENRAIZADO": "<:Enraizado:1290879541073678397>", "JURADORES": "<:Maracas:1290858583965175828>", "LIFECURSED": "<:Maldi:1291467716229730415>", "TALLADA": "<:Tallada:1290881286092886172>",
             "DAMNATION": "<:Maldiciones:1337862954820829294>", "ROMPERREINO": "<:RompeReino:1290881352182399017>", "DEMONFANG": "<:Colmillo:1370577697516032031>", "GUADAÑA": "<:Guadaa:1291468660917014538>", "PUAS": "<:Puas:1291468593506029638>",
             "ZARPAS": "<:Zarpas:1334560618941911181>", "ASTRAL": "<:Astral:1334556937328525413>", "HOJA INFINITA": "<:hoja:1395087940417228920>",
-        }
+        },
+        "default_params": {"tier": "8", "ip": "1450", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     },
     "brawl2": {
         "max_players": 20,
@@ -104,7 +104,8 @@ ROAMING_PARTIES = {
             "Astral": "<:Astral:1334556937328525413>", "Patas de oso": "<:PatasDeOso:1272599457778630737>",
             "Hoja infinita": "<:hoja:1395087940417228920>", "Colmillo": "<:Colmillo:1370577697516032031>",
             "Guadaña": "<:Guadaa:1291468660917014538>", "Puas": "<:Puas:1291468593506029638>"
-        }
+        },
+        "default_params": {"tier": "8", "ip": "1450", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     },
     "brawl_gucci": {
         "max_players": 20,
@@ -121,523 +122,264 @@ ROAMING_PARTIES = {
             "ENRAIZADO": "<:Enraizado:1290879541073678397>", "DAMNATION": "<:Maldiciones:1337862954820829294>",
             "LIFECURSED": "<:Maldi:1291467716229730415>", "PUTREFACTO": "<:Putrefacto:1370577320171016202>",
             "ROMPERREINO": "<:RompeReino:1290881352182399017>", "CAZAESPÍRITUS": "<:Cazaespiritu:1290881433816137821>",
-            "HOJA INFINITA": "<:Guadaa:1291468660917014538>", "ASTRAL": "<:Astral:1334556937328525413>",
+            "HOJA INFINITA": "<:hoja:1395087940417228920>", "ASTRAL": "<:Astral:1334556937328525413>",
             "ZARPAS": "<:Zarpas:1334560618941911181>", "INFERNALES": "<:Infernales:1338344041598812180>",
             "INFORTUNIO": "<:Infortunio:1290858784528531537>", "SANTI": "<:Santificador:1290858870260109384>",
-        }
+        },
+        "default_params": {"tier": "8", "ip": "1450", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     }
 }
 
-roaming_events = {} # Diccionario para almacenar los eventos de roaming activos
-ROAMING_EVENT_TIMEOUT = 7200 # 2 horas
-
-# ====================================================================
-# --- FUNCIONES HELPER ---
-# ====================================================================
-
-def get_roaming_caller_info(ctx, args):
-    """
-    Determina el nombre del caller a mostrar en el embed de forma flexible.
-    Asume que el último argumento de *args es el nombre del caller.
-    """
-    if args:
-        # Si el último argumento no es un número ni 'si'/'no', lo considera el caller.
-        last_arg = args[-1].lower()
-        if not last_arg.isdigit() and last_arg not in ('si', 'sí', 'no', 'n', 'y', 'yes'):
-            return args[-1]
-    return ctx.author.display_name # Asume que el caller es el que envía el comando
-
-def create_roaming_embed(party, event_data):
-    """Genera el mensaje embed para el evento de roaming."""
-    embed = discord.Embed(
-        title=f"🚀 ROAMING {party.upper()} (Caller: {event_data['caller_display']})",
-        description=f"**📍 Salimos de Fort Sterling Portal**\nTier: {event_data['tier_min']} | IP: {event_data['ip_min']}+",
-        color=0x00ff00 if "kiteo" in party else 0xFF0000
-    )
-
-    total_inscritos = sum(len(players) for players in event_data["inscripciones"].values())
-    embed.set_footer(text=f"📊 {total_inscritos}/{ROAMING_PARTIES[party]['max_players']} jugadores | ID: {event_data['event_id']}")
-
-    # Agrega la hora si está presente
-    if event_data.get("time"):
-        display_time = event_data["time"]
-        if not display_time.upper().endswith('UTC'):
-            display_time += ' UTC'
-        embed.add_field(name="⏰ Hora de Salida", value=display_time, inline=True)
-    
-    # Agrega la información de swap de gank
-    swap_status = "✅ **Sí**" if event_data.get("swap_gank") else "❌ **No**"
-    embed.add_field(name="⚔️ Swap de Gank", value=swap_status, inline=True)
-    
-    # Lista de roles
-    lineas_roles = []
-    for rol, limite in ROAMING_PARTIES[party]["roles"].items():
-        inscritos = event_data["inscripciones"].get(rol, [])
-        waitlist_players = event_data["waitlist"].get(rol, [])
-        emoji = ROAMING_PARTIES[party]["emojis"].get(rol, "")
-        slots = f"{len(inscritos)}/{limite}"
-        jugadores = ' '.join(f'<@{uid}>' for uid in inscritos[:3])
-        if len(inscritos) > 3:
-            jugadores += f" (+{len(inscritos)-3} más)"
-
-        linea = f"{emoji} **{rol.ljust(15)}** {slots.rjust(5)} → {jugadores or '-'}"
-        if waitlist_players:
-            jugadores_espera = ' '.join(f'<@{uid}>' for uid in waitlist_players)
-            linea += f" | ⏳ Espera: {jugadores_espera}"
-
-        lineas_roles.append(linea)
-
-    # Dividir en campos
-    for i in range(0, len(lineas_roles), 8):
-        embed.add_field(
-            name="🎮 ROLES DISPONIBLES" if i == 0 else "↳ Continuación",
-            value="\n".join(lineas_roles[i:i+8]),
-            inline=False
-        )
-
-    reglas = (
-        f"▸ Tier mínimo: **{event_data['tier_min']}**\n"
-        f"▸ IP mínima: **{event_data['ip_min']}+**\n"
-        "▸ Traer **embotelladas y comida**\n"
-        "▸ **Escuchar calls** y no flamear\n"
-    )
-    if total_inscritos < 15:
-        reglas += "▸ 🔔 **Se necesita más gente!**"
-    else:
-        reglas += "▸ ✅ **Listo para salir!**"
-
-    embed.add_field(name="📜 REGLAS DEL ROAMING", value=reglas, inline=False)
-    return embed
-
-# ====================================================================
-# --- VISTAS Y COMPONENTES DE UI ---
-# ====================================================================
-
-class RoamingRoleDropdown(discord.ui.Select):
-    def __init__(self, event_id: str, party_name: str):
-        self.event_id = event_id
-        self.party_name = party_name
-        
-        party_data = ROAMING_PARTIES.get(party_name)
-        options = []
-        if party_data:
-            for role_name, _ in party_data["roles"].items():
-                emoji = party_data["emojis"].get(role_name, "❓")
-                options.append(discord.SelectOption(label=role_name, emoji=emoji, value=role_name))
-
-        super().__init__(placeholder="Selecciona tu rol...", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        
-        # Pequeño retraso para evitar rate limits
-        await asyncio.sleep(0.5)
-
-        user = interaction.user
-        selected_role = self.values[0]
-        event = roaming_events.get(self.event_id)
-        party_data = ROAMING_PARTIES.get(self.party_name)
-
-        if not event or not party_data:
-            try:
-                await interaction.followup.send("Este evento de roaming ya no existe o es inválido.", ephemeral=True)
-            except discord.errors.HTTPException:
-                pass  # Ignorar errores de rate limit
-            return
-
-        inscripciones = event.get("inscripciones", {})
-        waitlist = event.get("waitlist", {})
-        
-        # 1. Eliminar al usuario de cualquier rol o lista de espera
-        user_id_str = str(user.id)
-        user_removed_from_old_spot = False
-
-        for role_name_in_insc, players_in_role in inscripciones.items():
-            if user_id_str in players_in_role:
-                inscripciones[role_name_in_insc].remove(user_id_str)
-                user_removed_from_old_spot = True
-                if waitlist.get(role_name_in_insc):
-                    next_player_id = waitlist[role_name_in_insc].pop(0)
-                    inscripciones[role_name_in_insc].append(next_player_id)
-                    try:
-                        next_player_obj = interaction.guild.get_member(int(next_player_id))
-                        if next_player_obj:
-                            try:
-                                await interaction.followup.send(
-                                    f"<@{next_player_id}>, has sido movido a **{role_name_in_insc}**.",
-                                    ephemeral=False
-                                )
-                            except discord.errors.HTTPException:
-                                pass  # Ignorar errores de rate limit
-                    except Exception:
-                        pass
-                break
-
-        if not user_removed_from_old_spot:
-            for role_name_in_wl, players_in_wl in waitlist.items():
-                if user_id_str in players_in_wl:
-                    waitlist[role_name_in_wl].remove(user_id_str)
-                    user_removed_from_old_spot = True
-                    break
-
-        # 2. Procesar nueva inscripción
-        max_slots = party_data["roles"][selected_role]
-        
-        if selected_role not in inscripciones:
-            inscripciones[selected_role] = []
-        if selected_role not in waitlist:
-            waitlist[selected_role] = []
-
-        current_players_in_role = len(inscripciones[selected_role])
-        
-        if current_players_in_role < max_slots:
-            if user_id_str not in inscripciones[selected_role]:
-                inscripciones[selected_role].append(user_id_str)
-                msg = f"¡Te has inscrito como **{selected_role}**!"
-                if user_removed_from_old_spot:
-                    msg += "\n(Tu inscripción anterior ha sido eliminada.)"
-                try:
-                    await interaction.followup.send(msg, ephemeral=True)
-                except discord.errors.HTTPException:
-                    pass
-            else:
-                msg = f"ℹ️ Ya estás inscrito como **{selected_role}**."
-                try:
-                    await interaction.followup.send(msg, ephemeral=True)
-                except discord.errors.HTTPException:
-                    pass
-        else:
-            if user_id_str not in waitlist[selected_role]:
-                waitlist[selected_role].append(user_id_str)
-                msg = f"**{selected_role}** está lleno. Has sido añadido a la lista de espera para este rol."
-                if user_removed_from_old_spot:
-                    msg += "\n(Tu inscripción anterior ha sido eliminada.)"
-                try:
-                    await interaction.followup.send(msg, ephemeral=True)
-                except discord.errors.HTTPException:
-                    pass
-            else:
-                msg = f"ℹ️ Ya estás en la lista de espera para **{selected_role}**."
-                try:
-                    await interaction.followup.send(msg, ephemeral=True)
-                except discord.errors.HTTPException:
-                    pass
-        
-        # Actualizar el mensaje del embed con retraso
-        await asyncio.sleep(1)
-        if event.get("message"):
-            try:
-                updated_embed = create_roaming_embed(self.party_name, event)
-                await event["message"].edit(
-                    embed=updated_embed, 
-                    view=RoamingView(self.event_id, self.party_name, event.get("caller_id"))
-            except discord.errors.HTTPException:
-                pass  # Ignorar errores de rate limit
+# Diccionario para almacenar eventos de roaming activos
+active_roaming_events = {}
+event_counter = 0
 
 class RoamingView(discord.ui.View):
-    def __init__(self, event_id: str, party_name: str, caller_id: int):
+    def __init__(self, event_id, composition_name, initial_roles_needed, max_players, mutual_exclusive_groups, caller_name):
         super().__init__(timeout=None)
         self.event_id = event_id
-        self.party_name = party_name
-        self.caller_id = caller_id
-        
-        self.add_item(RoamingRoleDropdown(event_id, party_name))
+        self.composition_name = composition_name
+        self.roles_needed = initial_roles_needed.copy()
+        self.current_players = {}  # {user_id: role_name}
+        self.max_players = max_players
+        self.mutual_exclusive_groups = mutual_exclusive_groups
+        self.caller_name = caller_name
+        self.update_select_menu()
 
-    @discord.ui.button(label="Salir de Roaming", style=discord.ButtonStyle.red, emoji="🏃", custom_id="roaming_leave_button")
-    async def leave_roaming(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True)
-        await asyncio.sleep(0.5)  # Pequeño retraso
-        
-        user = interaction.user
-        event = roaming_events.get(self.event_id)
-        
-        if not event:
-            try:
-                await interaction.followup.send("Este evento de roaming ya no existe.", ephemeral=True)
-            except discord.errors.HTTPException:
-                pass
-            return
+    def update_select_menu(self):
+        # Limpiar los ítems existentes en la vista para recrearlos
+        self.clear_items()
 
-        user_id_str = str(user.id)
-        user_found_and_removed = False
+        options = []
+        for role, count in self.roles_needed.items():
+            if count > 0:
+                emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "❓")
+                options.append(discord.SelectOption(label=f"{role} ({count} disponibles)", value=role, emoji=emoji_str))
 
-        for role_name, players in event["inscripciones"].items():
-            if user_id_str in players:
-                event["inscripciones"][role_name].remove(user_id_str)
-                user_found_and_removed = True
-                if event["waitlist"].get(role_name):
-                    next_player_id = event["waitlist"][role_name].pop(0)
-                    event["inscripciones"][role_name].append(next_player_id)
-                    try:
-                        next_player_obj = interaction.guild.get_member(int(next_player_id))
-                        if next_player_obj:
-                            try:
-                                await interaction.followup.send(
-                                    f"<@{next_player_id}>, has sido movido a **{role_name}**.",
-                                    ephemeral=False
-                                )
-                            except discord.errors.HTTPException:
-                                pass
-                    except Exception:
-                        pass
-                break
-        
-        if not user_found_and_removed:
-            for role_name, players in event["waitlist"].items():
-                if user_id_str in players:
-                    event["waitlist"][role_name].remove(user_id_str)
-                    user_found_and_removed = True
-                    break
+        if not options:
+            options.append(discord.SelectOption(label="Todos los roles tomados", value="none", default=True))
+            self.add_item(discord.ui.Select(placeholder="No hay roles disponibles", options=options, disabled=True))
+        else:
+            self.add_item(self.RoleSelect(options=options, custom_id=f"role_select_{self.event_id}"))
 
-        if user_found_and_removed:
-            try:
-                await interaction.followup.send(
-                    "Has abandonado tu rol/lugar en la lista de espera para este roaming.",
-                    ephemeral=True
-                )
-            except discord.errors.HTTPException:
-                pass
-            
-            await asyncio.sleep(1)
-            if event.get("message"):
-                try:
-                    updated_embed = create_roaming_embed(self.party_name, event)
-                    await event["message"].edit(
-                        embed=updated_embed, 
-                        view=RoamingView(self.event_id, self.party_name, self.caller_id)
-                    )
-                except discord.errors.HTTPException:
-                    pass
+        self.add_item(self.LeaveRoleButton(custom_id=f"leave_role_{self.event_id}"))
+        self.add_item(self.BenchButton(custom_id=f"bench_player_{self.event_id}"))
+        self.add_item(self.CloseEventButton(custom_id=f"close_event_{self.event_id}"))
 
-    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", custom_id="roaming_close_button")
-    async def close_roaming(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.caller_id:
-            try:
-                await interaction.response.send_message(
-                    "❌ Solo el creador del evento puede cerrarlo.",
-                    ephemeral=True
-                )
-            except discord.errors.HTTPException:
-                pass
-            return
+    def get_current_composition_string(self):
+        composition_str = ""
+        for role, count in self.roles_needed.items():
+            emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "")
+            composition_str += f"{emoji_str} **{role}**: {count} disponible(s)\n"
 
-        await interaction.response.defer(ephemeral=True)
-        event_data = roaming_events.get(self.event_id)
+        if self.current_players:
+            composition_str += "\n**Jugadores en la composición:**\n"
+            players_by_role = {}
+            for user_id, role in self.current_players.items():
+                if role not in players_by_role:
+                    players_by_role[role] = []
+                players_by_role[role].append(f"<@{user_id}>")
 
-        if not event_data:
-            try:
-                await interaction.followup.send(
-                    "Este evento de roaming ya no existe.",
-                    ephemeral=True
-                )
-            except discord.errors.HTTPException:
-                pass
-            return
+            for role, players_list in players_by_role.items():
+                emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "")
+                composition_str += f"{emoji_str} **{role}**: {', '.join(players_list)}\n"
+        return composition_str
 
-        # Eliminar el hilo si existe
-        if event_data.get("thread_id") and event_data.get("channel_id"):
-            try:
-                guild = interaction.guild
-                if guild:
-                    channel = guild.get_channel(event_data["channel_id"])
-                    if channel:
-                        thread = None
-                        try:
-                            thread = await channel.fetch_thread(event_data["thread_id"])
-                        except discord.NotFound:
-                            pass
-                        
-                        if thread:
-                            if thread.archived:
-                                await thread.edit(archived=False, reason="Desarchivando para eliminar roaming")
-                            await thread.delete()
-            except Exception:
-                pass
+    def check_mutual_exclusion(self, user_id, new_role):
+        current_role = self.current_players.get(user_id)
+        if not self.mutual_exclusive_groups:
+            return True
 
-        # Eliminar el mensaje principal
-        if event_data.get("message_id") and event_data.get("channel_id"):
-            try:
-                guild = interaction.guild
-                if guild:
-                    channel = guild.get_channel(event_data["channel_id"])
-                    if channel:
-                        message_to_delete = await channel.fetch_message(event_data["message_id"])
-                        await message_to_delete.delete()
-            except Exception:
-                pass
+        for group in self.mutual_exclusive_groups:
+            if new_role in group["roles"]:
+                # Check if user already has a role from this group
+                if current_role and current_role in group["roles"] and current_role != new_role:
+                    return False # Cannot take a new role from the same exclusive group
+                # Check if group limit is reached
+                count_in_group = sum(1 for uid, r in self.current_players.items() if r in group["roles"] and uid != user_id)
+                if count_in_group + 1 > group.get("max_total", len(group["roles"])):
+                    return False
+        return True
 
-        # Eliminar el evento del diccionario global
-        if self.event_id in roaming_events:
-            del roaming_events[self.event_id]
+    async def update_embed(self, message):
+        embed = message.embeds[0]
+        embed.description = self.get_current_composition_string()
+        embed.set_footer(text=f"Jugadores: {len(self.current_players)}/{self.max_players}")
+        await message.edit(embed=embed, view=self)
 
-        await asyncio.sleep(0.5)
-        try:
-            await interaction.followup.send(
-                "✅ Evento de Roaming cerrado y eliminado.",
-                ephemeral=True
-            )
-        except discord.errors.HTTPException:
-            pass
+    class RoleSelect(discord.ui.Select):
+        def __init__(self, options, custom_id):
+            super().__init__(placeholder="Selecciona tu rol...", options=options, custom_id=custom_id)
 
-# ====================================================================
-# --- COG DE ROAMING ---
-# ====================================================================
+        async def callback(self, interaction: discord.Interaction):
+            view: RoamingView = self.view
+            selected_role = self.values[0]
+            user_id = interaction.user.id
+            current_role = view.current_players.get(user_id)
 
-class RoamingCog(commands.Cog):
+            if selected_role == "none": # Should not happen if select is disabled correctly
+                await interaction.response.send_message("No hay roles disponibles en este momento.", ephemeral=True)
+                return
+
+            if current_role == selected_role:
+                await interaction.response.send_message(f"Ya estás en el rol de **{selected_role}**.", ephemeral=True)
+                return
+
+            # Handle mutual exclusive roles
+            if not view.check_mutual_exclusion(user_id, selected_role):
+                await interaction.response.send_message(f"No puedes tomar el rol de **{selected_role}** porque ya estás en un rol mutuamente excluyente o el límite del grupo se ha alcanzado.", ephemeral=True)
+                return
+
+            if view.roles_needed[selected_role] > 0:
+                if current_role: # User is changing role
+                    view.roles_needed[current_role] += 1 # Free up the old role
+                    view.current_players.pop(user_id) # Remove from current players
+                    
+                view.roles_needed[selected_role] -= 1
+                view.current_players[user_id] = selected_role
+
+                view.update_select_menu()
+                await view.update_embed(interaction.message)
+                await interaction.response.send_message(f"Te has unido a la composición como **{selected_role}**.", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"No hay más espacios para el rol de **{selected_role}**.", ephemeral=True)
+
+    class LeaveRoleButton(discord.ui.Button):
+        def __init__(self, custom_id):
+            super().__init__(label="Salir de Rol", style=discord.ButtonStyle.red, custom_id=custom_id)
+
+        async def callback(self, interaction: discord.Interaction):
+            view: RoamingView = self.view
+            user_id = interaction.user.id
+            current_role = view.current_players.get(user_id)
+
+            if current_role:
+                view.roles_needed[current_role] += 1
+                view.current_players.pop(user_id)
+                view.update_select_menu()
+                await view.update_embed(interaction.message)
+                await interaction.response.send_message(f"Has salido del rol de **{current_role}**.", ephemeral=True)
+            else:
+                await interaction.response.send_message("No estás asignado a ningún rol en esta composición.", ephemeral=True)
+
+    class BenchButton(discord.ui.Button):
+        def __init__(self, custom_id):
+            super().__init__(label="Banca", style=discord.ButtonStyle.grey, custom_id=custom_id)
+
+        async def callback(self, interaction: discord.Interaction):
+            # Only the caller can use this button
+            view: RoamingView = self.view
+            caller_member = interaction.guild.get_member_by_id(int(view.caller_name.split('#')[1][:-1])) # Extract ID from <@!ID>
+            if interaction.user != caller_member:
+                await interaction.response.send_message("Solo el caller puede usar este botón.", ephemeral=True)
+                return
+
+            # Here you would implement logic for moving someone to bench
+            # For simplicity, let's just confirm it's for the caller.
+            await interaction.response.send_message("Funcionalidad de banca (próximamente).", ephemeral=True)
+
+
+    class CloseEventButton(discord.ui.Button):
+        def __init__(self, custom_id):
+            super().__init__(label="Cerrar Evento", style=discord.ButtonStyle.danger, custom_id=custom_id)
+
+        async def callback(self, interaction: discord.Interaction):
+            view: RoamingView = self.view
+            caller_id = int(view.caller_name.split('<@')[1][:-1]) # Extract ID from <@ID> or <@!ID>
+            if interaction.user.id != caller_id:
+                await interaction.response.send_message("Solo el caller puede cerrar este evento.", ephemeral=True)
+                return
+
+            del active_roaming_events[view.event_id]
+            for item in view.children:
+                item.disabled = True
+            await interaction.response.edit_message(content="¡Evento de roaming cerrado!", view=view, embed=None) # Clear embed or update as closed
+            await interaction.followup.send(f"El evento de roaming '{view.event_id}' ha sido cerrado por {interaction.user.mention}.", ephemeral=False)
+
+
+class Roaming(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.cleanup_roaming_events.start()
+        global event_counter
+        event_counter = 0 # Reset for development, in production you might load from persistent storage
 
-    def cog_unload(self):
-        self.cleanup_roaming_events.cancel()
+    @commands.command(name="roaming")
+    async def roaming_command(self, ctx, composition_name: str, tier: str = None, ip: str = None, time_str: str = None, gank_swap: str = None, caller: discord.Member = None):
+        global event_counter
 
-    @commands.command(name='roaming')
-    async def start_roaming_event(self, ctx, party_name: str, tier_min: str = None, ip_min: int = None, swap_gank_str: str = None, *, caller_display_name_or_none: str = None):
-        """
-        Inicia un evento de Roaming con party, tier, IP, swap de gank y caller opcional.
-        """
-        party_name_lower = party_name.lower()
-        if party_name_lower not in ROAMING_PARTIES:
-            await ctx.send(f"Party '{party_name}' no encontrada. Parties disponibles: {', '.join(ROAMING_PARTIES.keys())}")
+        composition_name = composition_name.lower()
+        if composition_name not in ROAMING_PARTIES:
+            await ctx.send(f"Composición '{composition_name}' no encontrada. Las composiciones disponibles son: {', '.join(ROAMING_PARTIES.keys())}")
             return
 
-        party_data = ROAMING_PARTIES[party_name_lower]
+        comp_data = ROAMING_PARTIES[composition_name]
+        defaults = comp_data["default_params"]
 
-        # Valores por defecto
-        default_tier = "8"
-        default_ip = 1450
-        default_swap_gank = False
-
-        if party_name_lower == "pocho":
-            default_tier = "4.2"
-            default_ip = 1200
-
-        # Asignar valores
-        final_tier_min = tier_min if tier_min is not None else default_tier
-        final_ip_min = ip_min if ip_min is not None else default_ip
+        # Apply defaults if arguments are not provided
+        tier = tier if tier else defaults["tier"]
+        ip = ip if ip else defaults["ip"]
+        time_offset_minutes = defaults["time_offset_minutes"]
+        if time_str:
+            try:
+                time_offset_minutes = int(time_str)
+            except ValueError:
+                await ctx.send("La hora debe ser un número en minutos (ej. 20 para 20 minutos).")
+                return
         
-        final_swap_gank = default_swap_gank
-        if swap_gank_str is not None:
-            if swap_gank_str.lower() in ('si', 'sí', 'y', 'yes'):
-                final_swap_gank = True
-            elif swap_gank_str.lower() in ('no', 'n'):
-                final_swap_gank = False
-            else:
-                await ctx.send("El valor para 'swap de gank' debe ser 'si' o 'no'. Se usará el valor por defecto.")
-
-        # Validaciones
-        try:
-            tier_val = float(final_tier_min)
-            if not (1 <= tier_val <= 8.4):
-                await ctx.send("El tier mínimo debe ser un número entre 1 y 8.4. Se usará el valor por defecto.")
-                final_tier_min = default_tier
-        except ValueError:
-            await ctx.send("El tier mínimo debe ser un número válido (ej. 8 o 4.2). Se usará el valor por defecto.")
-            final_tier_min = default_tier
-
-        try:
-            if final_ip_min < 0:
-                raise ValueError
-        except ValueError:
-            await ctx.send("La IP mínima debe ser un número válido. Se usará el valor por defecto.")
-            final_ip_min = default_ip
+        gank_swap = gank_swap if gank_swap else defaults["gank_swap"]
+        caller_display = caller.mention if caller else ctx.author.mention
         
-        caller_display = caller_display_name_or_none if caller_display_name_or_none else ctx.author.display_name
+        # Generar ID único para el evento
+        event_counter += 1
+        event_id = f"{ctx.author.name.replace(' ', '_')}-{event_counter}" # Use author's name and counter
+
+        # Calculate ETA
+        eta_time = datetime.now() + timedelta(minutes=time_offset_minutes)
+        eta_timestamp = int(eta_time.timestamp())
+
+        roles_needed_initial = comp_data["roles"].copy()
         
-        current_event_time = datetime.now()
-        departure_time = current_event_time + timedelta(minutes=15)
-        display_departure_time = departure_time.strftime("%H:%M")
+        # Build the initial embed
+        embed = discord.Embed(
+            title=f"📢 ¡ROAMING - Composición: {composition_name.upper()}!",
+            description=f"**Tier**: {tier}\n**IP**: {ip}\n**ETA**: <t:{eta_timestamp}:R>\n**Gank Swap**: {gank_swap}\n**Caller**: {caller_display}\n\n**Roles Necesarios:**\n",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="---", value=self.get_initial_composition_string(composition_name), inline=False) # Use a helper method for string
+        embed.set_footer(text=f"Jugadores: 0/{comp_data['max_players']}")
 
-        event_id = f"roaming-{int(time.time())}-{random.randint(1000, 9999)}"
+        # Create the view with buttons and select menu
+        mutual_exclusive_groups = comp_data.get("mutually_exclusive_groups", [])
+        view = RoamingView(event_id, composition_name, roles_needed_initial, comp_data["max_players"], mutual_exclusive_groups, caller_display)
 
-        event_data = {
-            "event_id": event_id,
-            "caller_id": ctx.author.id,
-            "caller_display": caller_display,
-            "channel_id": ctx.channel.id,
-            "party_name": party_name_lower,
-            "tier_min": final_tier_min,
-            "ip_min": final_ip_min,
-            "swap_gank": final_swap_gank,
-            "inscripciones": {rol: [] for rol in party_data["roles"]},
-            "waitlist": {rol: [] for rol in party_data["roles"]},
-            "start_time": time.time(),
-            "message_id": None,
-            "thread_id": None,
-            "thread_channel_id": None,
-            "time": display_departure_time
-        }
-
-        try:
-            await ctx.send(f"¡Atención @everyone! Se ha iniciado un nuevo Roaming: **{party_name.upper()}**!")
-        except Exception:
-            pass
-
-        embed = create_roaming_embed(party_name_lower, event_data)
-        view = RoamingView(event_id, party_name_lower, ctx.author.id)
-
-        message = await ctx.send(embed=embed, view=view)
-        event_data["message_id"] = message.id
-        event_data["message"] = message
-
-        roaming_events[event_id] = event_data
-
-        # Crear hilo de discusión
-        try:
-            thread_name = f"Roaming {party_name.upper()} - {caller_display}"
-            thread = await message.create_thread(name=thread_name)
-            await thread.send(f"¡Hilo de discusión para el roaming {party_name.upper()}!")
-            event_data["thread_id"] = thread.id
-            event_data["thread_channel_id"] = thread.id
-        except Exception:
-            pass
-
-        # Eliminar mensaje original del comando
-        try:
-            await ctx.message.delete()
-        except:
-            pass
-
-    @tasks.loop(minutes=30)
-    async def cleanup_roaming_events(self):
-        """Limpia eventos de roaming antiguos."""
-        current_time = time.time()
-        events_to_remove = []
-
-        for event_id, event_data in roaming_events.items():
-            if current_time - event_data["start_time"] > ROAMING_EVENT_TIMEOUT:
-                events_to_remove.append(event_id)
+        # Send the message with the embed and view
+        message = await ctx.send(f"@everyone ¡Preparando roaming!", embed=embed, view=view)
         
-        for event_id in events_to_remove:
-            event_data = roaming_events.get(event_id)
-            if event_data:
-                # Intentar eliminar el mensaje principal
-                if event_data.get("message_id") and event_data.get("channel_id"):
-                    try:
-                        channel = self.bot.get_channel(event_data["channel_id"])
-                        if channel:
-                            message_to_delete = await channel.fetch_message(event_data["message_id"])
-                            await message_to_delete.delete()
-                    except:
-                        pass
+        # Store the event
+        active_roaming_events[event_id] = {"message": message, "view": view, "caller_id": ctx.author.id}
+    
+    def get_initial_composition_string(self, composition_name):
+        comp_data = ROAMING_PARTIES[composition_name]
+        composition_str = ""
+        for role, count in comp_data["roles"].items():
+            emoji_str = comp_data["emojis"].get(role, "")
+            # Special handling for mutually exclusive roles in initial display
+            is_exclusive = False
+            for group in comp_data.get("mutually_exclusive_groups", []):
+                if role in group["roles"]:
+                    if not is_exclusive: # Add a header for the group if not already added
+                        composition_str += f"**Roles Excluyentes ({' / '.join(group['roles'])}):**\n"
+                    is_exclusive = True
+                    # Only show one entry for the mutually exclusive group, e.g., "LOCUS / ENRAIZADO (1)"
+                    if group["roles"][0] == role: # Only display for the first role in the group
+                        combined_roles = " / ".join(group["roles"])
+                        composition_str += f"❓ **{combined_roles}**: 1 disponible(s)\n"
+                    break # Don't process this role further if it's part of an exclusive group
 
-                # Intentar eliminar el hilo
-                if event_data.get("thread_id") and event_data.get("channel_id"):
-                    try:
-                        channel = self.bot.get_channel(event_data["channel_id"])
-                        if channel:
-                            thread_to_delete = await channel.fetch_thread(event_data["thread_id"])
-                            if thread_to_delete.archived:
-                                await thread_to_delete.edit(archived=False, reason="Desarchivando para eliminar en limpieza")
-                            await thread_to_delete.delete()
-                    except:
-                        pass
-                
-                del roaming_events[event_id]
+            if not is_exclusive:
+                composition_str += f"{emoji_str} **{role}**: {count} disponible(s)\n"
+        return composition_str
 
-    @cleanup_roaming_events.before_loop
-    async def before_cleanup_roaming(self):
-        await self.bot.wait_until_ready()
 
 async def setup(bot):
-    await bot.add_cog(RoamingCog(bot))
+    await bot.add_cog(Roaming(bot))
