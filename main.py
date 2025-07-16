@@ -134,16 +134,42 @@ ROAMING_PARTIES = {
     "brawl": {
         "max_players": 20,
         "roles": {
-            "GOLEM": 1, "MARTILLO 1H": 1, "MAZA PESADA": 1, "MONARCA": 1, "SAGRADO": 3, "INFORTUNIO": 1,
-            "ENRAIZADO": 1, "JURADORES": 1, "LIFECURSED": 1, "TALLADA": 1, "DAMNATION": 1,
-            "ROMPERREINO": 1, "DEMONFANG": 1, "GUADAÑA": 1, "PUAS": 1, "ZARPAS": 1, "ASTRAL": 1,
-            "HOJA INFINITA": 1,
+            "GOLEM": 1,
+            "PESADA": 1,
+            "MONARCA": 1,
+            "MARTILLO 1 H / EQUILIBRIO": 1,
+            "JURADORES": 1,
+            "LIFECURSED": 1,
+            "LOCUS": 1,
+            "GARZA / PUTREFACTO": 1,
+            "TALLADA / CAZAESPIRITUS": 1,
+            "DAMNATION": 1,
+            "ROMPERREINOS": 1,
+            "ASTRAL": 1,
+            "DEMONFANG": 1,
+            "FALCE/ GUADAÑA": 1,
+            "HOJA INFINITA": 2,
+            "SANTI": 3,
+            "INFORTUNIO": 1,
         },
         "emojis": {
-            "GOLEM": "🪨", "MARTILLO 1H": "🔨", "MAZA PESADA": "⚔️", "MONARCA": "😈", "SAGRADO": "✨",
-            "INFORTUNIO": "🌿", "ENRAIZADO": "🌱", "JURADORES": "⚖️", "LIFECURSED": "💀", "TALLADA": "🗡️",
-            "DAMNATION": "😈", "ROMPERREINO": "💥", "DEMONFANG": "👹", "GUADAÑA": "💀", "PUAS": "🌵",
-            "ZARPAS": "🐾", "ASTRAL": "✨", "HOJA INFINITA": "🗡️",
+            "GOLEM": "<:Terrunico:1290880192092438540>",
+            "PESADA": "<:stoper:1290858463135662080>",
+            "MONARCA": "😈",
+            "MARTILLO 1 H / EQUILIBRIO": "🔨",
+            "JURADORES": "<:Maracas:1290858583965175828>",
+            "LIFECURSED": "<:Maldi:1291467716229730415>",
+            "LOCUS": "<:Locus:1291467422238249043>",
+            "GARZA / PUTREFACTO": "<:Putrefacto:1370577320171016202>",
+            "TALLADA / CAZAESPIRITUS": "<:Cazaespiritu:1290881433816137821>",
+            "DAMNATION": "<:Maldiciones:1337862954820829294>",
+            "ROMPERREINOS": "<:RompeReino:1290881352182399017>",
+            "ASTRAL": "<:Astral:1334556937328525413>",
+            "DEMONFANG": "👹",
+            "FALCE/ GUADAÑA": "<:Guadaa:1291468660917014538>",
+            "HOJA INFINITA": "⚔️",
+            "SANTI": "<:Santificador:1290858870260109384>",
+            "INFORTUNIO": "<:Infortunio:1290858784528531537>",
         }
     },
     "brawl2": {
@@ -203,6 +229,45 @@ ROAMING_PARTIES = {
             "HOJA INFINITA": "<:Guadaa:1291468660917014538>", "ASTRAL": "<:Astral:1334556937328525413>",
             "ZARPAS": "<:Zarpas:1334560618941911181>", "INFERNALES": "<:Infernales:1338344041598812180>",
             "INFORTUNIO": "<:Infortunio:1290858784528531537>", "SANTI": "<:Santificador:1290858870260109384>",
+        }
+    },
+    "pocho": { # New roaming composition
+        "max_players": 20,
+        "roles": {
+            "GOLEM": 1,
+            "PESADA": 2,
+            "MARTILLO 1 H": 1,
+            "JURADORES": 1,
+            "LIFECURSED": 1,
+            "LOCUS / ENRAIZADO": 1,
+            "GARZA": 1,
+            "TALLADA / CAZAESPIRITUS": 1,
+            "DAMNATION": 1,
+            "ROMPERREINOS": 1,
+            "DEMONFANG": 2,
+            "GUADAÑA": 1,
+            "INFERNALES": 2,
+            "GRAN BASTON SAGRADO": 2,
+            "REDENCION": 1,
+            "INFORTUNIO": 1,
+        },
+        "emojis": {
+            "GOLEM": "<:Terrunico:1290880192092438540>",
+            "PESADA": "<:stoper:1290858463135662080>",
+            "MARTILLO 1 H": "🔨",
+            "JURADORES": "<:Maracas:1290858583965175828>",
+            "LIFECURSED": "<:Maldi:1291467716229730415>",
+            "LOCUS / ENRAIZADO": "<:Locus:1291467422238249043>",
+            "GARZA": "🐦",
+            "TALLADA / CAZAESPIRITUS": "<:Cazaespiritu:1290881433816137821>",
+            "DAMNATION": "<:Maldiciones:1337862954820829294>",
+            "ROMPERREINOS": "<:RompeReino:1290881352182399017>",
+            "DEMONFANG": "👹",
+            "GUADAÑA": "<:Guadaa:1291468660917014538>",
+            "INFERNALES": "<:Infernales:1338344041598812180>",
+            "GRAN BASTON SAGRADO": "✨",
+            "REDENCION": "✨",
+            "INFORTUNIO": "<:Infortunio:1290858784528531537>",
         }
     }
 }
@@ -331,7 +396,6 @@ async def update_wb_embed(event_id):
                 event["priority_mode"] = False
                 is_disabled = False
                 footer_text = "🔓 Todos pueden anotarse"
-                embed_color = 0x00FF00
                 embed.description = event["description"]
                 if event_id in wb_priority_users:
                     del wb_priority_users[event_id]
@@ -374,7 +438,7 @@ def create_cta_embed(event_data):
     """Genera el mensaje embed para el evento CTA (Pelea Obligatoria)."""
     embed = discord.Embed(
         title=f"🚨 ¡PELEA OBLIGATORIA! - Hora de Masseo: {event_data['mass_time']} UTC 🚨",
-        description="¡Prepárense para la acción! Anótate en el rol que te corresponda.",
+        description="¡Pense en ello como el preaviso para la proxima gran aventura. Anotate en el rol que te corresponda.",
         color=0xFF0000
     )
     embed.set_thumbnail(url="https://assets.albiononline.com/assets/images/icons/faction_standings_martlock.png")
@@ -655,7 +719,6 @@ class WB_LeaveButton(discord.ui.Button):
                             await promoted_member.send(f"🎉 ¡Has sido movido de la lista de espera al rol **{removed_role}** en el evento de World Boss {WB_BOSS_DATA[event['boss']]['name']}!")
                         except discord.Forbidden:
                             print(f"No se pudo enviar DM a {promoted_member.name}. Probablemente tiene los DMs cerrados.")
-
             await interaction.followup.send("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
             await update_wb_embed(self.event_id)
         else:
@@ -732,1020 +795,666 @@ class WB_WaitlistRoleDropdown(discord.ui.Select):
         role = self.values[0]
 
         # Re-check if user is already in any role or waitlist (race condition)
-        partial_user_id = interaction.user.id
+        user_id = interaction.user.id
         for existing_role, users in event["inscriptions"].items():
-            if partial_user_id in users:
+            if user_id in users:
                 return await interaction.followup.send(
                     f"❌ Ya estás inscrito como **{existing_role}**. No puedes unirte a la lista de espera.",
                     ephemeral=True
                 )
         for existing_role, users in event["waitlist"].items():
-            if partial_user_id in users:
+            if user_id in users:
                 return await interaction.followup.send(
                     f"❌ Ya estás en la lista de espera para **{existing_role}**. No puedes unirte a otra.",
                     ephemeral=True
                 )
 
-        # Re-check if role is still full
-        if len(event["inscriptions"][role]) < WB_BOSS_DATA[self.boss]["roles"][role]:
-            await interaction.followup.send(f"✅ ¡Un slot se abrió en **{role}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
-            await update_wb_embed(self.event_id) # Update embed to reflect open slot
-            return
-
         # Add to waitlist
-        event["waitlist"][role].append(partial_user_id)
+        event["waitlist"][role].append(user_id)
         await interaction.followup.send(f"✅ Te has unido a la lista de espera para **{role}**.", ephemeral=True)
         await update_wb_embed(self.event_id)
 
+
 # --- Clases para Roaming Parties ---
-class RoamingEventView(discord.ui.View):
-    def __init__(self, party, event_id, caller_id, event_data):
+
+class RoamingRoleSelectorView(discord.ui.View):
+    def __init__(self, party_type, event_id, caller_id):
         super().__init__(timeout=None)
-        self.party = party
+        self.party_type = party_type
         self.event_id = event_id
         self.caller_id = caller_id
-        self.event_data = event_data # Referencia a la entrada en roaming_events
+        self.add_item(RoamingRoleDropdown(party_type, event_id))
+        self.add_item(RoamingLeaveButton(event_id))
 
-        # Agrega el menú desplegable de roles
-        self.add_item(self.create_role_selector())
-
-    def create_role_selector(self):
-        opciones = [
-            discord.SelectOption(
-                label=rol,
-                emoji=ROAMING_PARTIES[self.party]["emojis"].get(rol),
-                description=f"Slots: {len(self.event_data['inscripciones'][rol])}/{ROAMING_PARTIES[self.party]['roles'][rol]}"
-            ) for rol in ROAMING_PARTIES[self.party]["roles"]
-        ]
-
-        select_menu = discord.ui.Select(
-            placeholder="Elige tu rol",
-            min_values=1,
-            max_values=1,
-            options=opciones
-        )
-
-        async def callback(interaction: discord.Interaction):
-            # MODIFICACIÓN: Defer la respuesta
-            await interaction.response.defer()
-
-            user_id = interaction.user.id
-            rol_elegido = select_menu.values[0]
-
-            # Remover de cualquier rol previo en ESTE evento (principal o espera)
-            for rol in self.event_data["inscripciones"]:
-                if user_id in self.event_data["inscripciones"][rol]:
-                    self.event_data["inscripciones"][rol].remove(user_id)
-            for rol in self.event_data["waitlist"]:
-                if user_id in self.event_data["waitlist"][rol]:
-                    self.event_data["waitlist"][rol].remove(user_id)
-
-            # Verificar slot disponible
-            if len(self.event_data["inscripciones"][rol_elegido]) >= ROAMING_PARTIES[self.party]["roles"][rol_elegido]:
-                await interaction.followup.send("❌ Este rol ya está lleno. Por favor, usa el botón 'Lista de Espera'.", ephemeral=True)
-                return
-
-            # Inscribir al jugador
-            self.event_data["inscripciones"][rol_elegido].append(user_id)
-
-            # Actualizar embed
-            embed = create_roaming_embed(self.party, self.event_data)
-            await self.event_data["message"].edit(embed=embed, view=RoamingEventView(self.party, self.event_id, self.caller_id, self.event_data))
-            await interaction.followup.send(
-                f"✅ Te has unido como **{rol_elegido}** en el evento de {self.event_data['caller_display']}",
-                ephemeral=True
-            )
-
-        select_menu.callback = callback
-        return select_menu
-
-    # --- Botón para SALIR de rol ---
-    @discord.ui.button(label="Salir de Rol", style=discord.ButtonStyle.red, emoji="🏃")
-    async def leave_role_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # MODIFICACIÓN: Defer la respuesta
-        await interaction.response.defer(ephemeral=True)
-
-        user_id = interaction.user.id
-        user_removed = False
-
-        # Buscar en inscripciones (party principal)
-        for rol, usuarios in self.event_data["inscripciones"].items():
-            if user_id in usuarios:
-                usuarios.remove(user_id)
-                user_removed = True
-                break
-
-        # Si no está en el party principal, buscar en la lista de espera
-        if not user_removed:
-            for rol, usuarios in self.event_data["waitlist"].items():
-                if user_id in usuarios:
-                    usuarios.remove(user_id)
-                    user_removed = True
-                    break
-
-        if user_removed:
-            embed = create_roaming_embed(self.party, self.event_data)
-            await self.event_data["message"].edit(embed=embed)
-            await interaction.followup.send("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
-        else:
-            await interaction.followup.send("❌ No estás inscrito en ningún rol ni en lista de espera en este evento.", ephemeral=True)
-
-    # --- Botón para UNIRSE a la lista de espera ---
-    @discord.ui.button(label="Lista de Espera", style=discord.ButtonStyle.secondary, emoji="👥")
-    async def join_waitlist_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # MODIFICACIÓN: Defer la respuesta
-        await interaction.response.defer(ephemeral=True)
-        
-        user_id = interaction.user.id
-
-        # Remover de cualquier rol previo en ESTE evento
-        for rol in self.event_data["inscripciones"]:
-            if user_id in self.event_data["inscripciones"][rol]:
-                await interaction.followup.send("❌ Ya estás en un rol principal. Usa 'Salir de Rol' para moverte a la lista de espera.", ephemeral=True)
-                return
-        for rol in self.event_data["waitlist"]:
-            if user_id in self.event_data["waitlist"][rol]:
-                await interaction.followup.send("❌ Ya estás en la lista de espera para un rol. Usa 'Salir de Rol' para cambiar.", ephemeral=True)
-                return
-
-        # Crear un select para que elija el rol en la lista de espera
-        full_roles = [rol for rol, limite in ROAMING_PARTIES[self.party]["roles"].items() if len(self.event_data["inscripciones"][rol]) >= limite]
-
-        if not full_roles:
-            return await interaction.followup.send("✅ ¡No hay roles llenos en este momento! Usa el menú desplegable principal para unirte.", ephemeral=True)
-
-        options = [
-            discord.SelectOption(
-                label=rol,
-                emoji=ROAMING_PARTIES[self.party]["emojis"].get(rol),
-                description=f"Jugadores en espera: {len(self.event_data['waitlist'][rol])}"
-            ) for rol in full_roles
-        ]
-
-        select_waitlist = discord.ui.Select(
-            placeholder="Elige rol para la lista de espera",
-            min_values=1,
-            max_values=1,
-            options=options
-        )
-
-        async def waitlist_callback(interact: discord.Interaction):
-            # MODIFICACIÓN: Defer la respuesta para el nuevo dropdown
-            await interact.response.defer(ephemeral=True)
-
-            rol_elegido = select_waitlist.values[0]
-            user_id = interact.user.id # Obtener el ID del usuario de la nueva interacción
-
-            # Verifica si el rol sigue lleno (puede haber cambiado en el intertanto)
-            if len(self.event_data["inscripciones"][rol_elegido]) < ROAMING_PARTIES[self.party]["roles"][rol_elegido]:
-                await interact.followup.send(f"🎉 ¡Un slot se abrió en **{rol_elegido}**! Por favor, usa el menú desplegable principal para unirte directamente.", ephemeral=True)
-                return
-
-            self.event_data["waitlist"][rol_elegido].append(user_id)
-
-            embed = create_roaming_embed(self.party, self.event_data)
-            await self.event_data["message"].edit(embed=embed)
-            await interact.followup.send(f"✅ Te has unido a la lista de espera para **{rol_elegido}**.", ephemeral=True)
-
-        select_waitlist.callback = waitlist_callback
-
-        temp_view = discord.ui.View(timeout=60)
-        temp_view.add_item(select_waitlist)
-
-        await interaction.followup.send("Selecciona el rol para la lista de espera:", view=temp_view, ephemeral=True)
-
-    # --- Botón para CERRAR el evento (Solo el caller) ---
-    @discord.ui.button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫")
-    async def close_event_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 1. Verificar si el usuario es el caller original
+    @discord.ui.button(label="Cerrar Roaming", style=discord.ButtonStyle.danger, emoji="🚫", row=1)
+    async def close_roaming_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.caller_id:
             return await interaction.response.send_message("❌ Solo el que lanzó el evento puede cerrarlo.", ephemeral=True)
 
-        # 2. Obtener el hilo asociado
-        thread = interaction.message.thread
+        if self.event_id not in roaming_events:
+            return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
 
-        # 3. MODIFICACIÓN CLAVE: Eliminar el hilo de forma segura
-        if thread:
-            try:
-                # Paso 1: Desarchivar el hilo si está archivado.
-                if thread.archived:
-                    await thread.edit(archived=False, reason="Desarchivando para eliminar")
-                
-                # Paso 2: Eliminar el hilo.
-                await thread.delete()
-                print(f"Hilo del evento Roaming {self.event_id} eliminado correctamente.")
-            except discord.NotFound:
-                print(f"El hilo del evento Roaming {self.event_id} ya no existe.")
-            except discord.Forbidden:
-                print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento Roaming {self.event_id}.")
-            except Exception as e:
-                print(f"Error inesperado al eliminar el hilo del evento Roaming {self.event_id}: {e}")
-        else:
-            print("No se encontró un hilo asociado al mensaje del evento Roaming.")
-            
-        # 4. Eliminar el mensaje principal
+        # Eliminar el mensaje principal
         try:
             await interaction.message.delete()
-            print(f"Mensaje del evento Roaming {self.event_id} eliminado correctamente.")
+            print(f"Mensaje del evento roaming {self.event_id} eliminado correctamente.")
         except discord.Forbidden:
-            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento Roaming {self.event_id}.")
-            # Si no puede borrar el mensaje, desactiva la vista y notifica.
+            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento roaming {self.event_id}.")
             for item in self.children:
                 item.disabled = True
             await interaction.response.edit_message(view=self)
             return await interaction.followup.send("✅ Evento cerrado, pero no pude borrar el mensaje (permisos faltantes).", ephemeral=True)
         except Exception as e:
-            print(f"Error inesperado al eliminar el mensaje del evento Roaming {self.event_id}: {e}")
-            # Si no puede borrar el mensaje, desactiva la vista y notifica.
+            print(f"Error inesperado al eliminar el mensaje del evento roaming {self.event_id}: {e}")
             for item in self.children:
                 item.disabled = True
             await interaction.response.edit_message(view=self)
             return await interaction.followup.send("❌ Ocurrió un error al intentar eliminar el mensaje.", ephemeral=True)
         
-        # 5. Eliminar el evento del diccionario global
-        if self.event_id in roaming_events:
-            del roaming_events[self.event_id]
+        del roaming_events[self.event_id]
+        await interaction.response.send_message(f"✅ Evento de roaming cerrado y eliminado.", ephemeral=True)
 
-        # 6. Responde a la interacción.
-        await interaction.response.send_message(f"✅ Evento de roaming `{self.event_id}` cerrado y eliminado.", ephemeral=True)
+class RoamingRoleDropdown(discord.ui.Select):
+    def __init__(self, party_type, event_id):
+        self.party_type = party_type
+        self.event_id = event_id
+        options = [
+            discord.SelectOption(
+                label=role,
+                emoji=ROAMING_PARTIES[party_type]["emojis"].get(role),
+                description=f"0/{ROAMING_PARTIES[party_type]["roles"][role]}"
+            ) for role in ROAMING_PARTIES[party_type]["roles"]
+        ]
+        super().__init__(
+            placeholder="Elige tu rol",
+            options=options,
+            max_values=1
+        )
 
-# --- Clases para CTA (Pelea Obligatoria) ---
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        if self.event_id not in roaming_events:
+            return await interaction.followup.send("❌ Este evento ya no está activo.", ephemeral=True)
+
+        event = roaming_events[self.event_id]
+        party_data = ROAMING_PARTIES[self.party_type]
+        selected_role = self.values[0]
+
+        # Check if user is already in any role or waitlist
+        for role, users in event["inscripciones"].items():
+            if interaction.user.id in users:
+                return await interaction.followup.send(
+                    f"❌ Ya estás inscrito como **{role}**. Usa el botón 'Salir de Rol' primero.",
+                    ephemeral=True
+                )
+        for role, users in event["waitlist"].items():
+            if interaction.user.id in users:
+                return await interaction.followup.send(
+                    f"❌ Ya estás en la lista de espera para **{role}**. Usa el botón 'Salir de Rol' primero.",
+                    ephemeral=True
+                )
+
+        # Check if party is full
+        current_total_players = sum(len(players) for players in event["inscripciones"].values())
+        if current_total_players >= party_data["max_players"]:
+            # If party is full, add to waitlist
+            if selected_role not in event["waitlist"]:
+                event["waitlist"][selected_role] = []
+            event["waitlist"][selected_role].append(interaction.user.id)
+            await interaction.followup.send(f"✅ La party está llena. Te has unido a la lista de espera para **{selected_role}**.", ephemeral=True)
+        else:
+            # Check if selected role is full
+            if len(event["inscripciones"].get(selected_role, [])) >= party_data["roles"][selected_role]:
+                if selected_role not in event["waitlist"]:
+                    event["waitlist"][selected_role] = []
+                event["waitlist"][selected_role].append(interaction.user.id)
+                await interaction.followup.send(f"✅ El rol **{selected_role}** está lleno. Te has unido a la lista de espera.", ephemeral=True)
+            else:
+                event["inscripciones"].setdefault(selected_role, []).append(interaction.user.id)
+                await interaction.followup.send(f"✅ Te has unido como **{selected_role}**", ephemeral=True)
+        
+        await interaction.message.edit(embed=create_roaming_embed(self.party_type, event), view=self.view)
+
+class RoamingLeaveButton(discord.ui.Button):
+    def __init__(self, event_id):
+        super().__init__(label="Salir de Rol", style=discord.ButtonStyle.red, custom_id=f"roaming_leave_role_{event_id}")
+        self.event_id = event_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        if self.event_id not in roaming_events:
+            return await interaction.followup.send("❌ Este evento ya no está activo.", ephemeral=True)
+
+        event = roaming_events[self.event_id]
+        party_type = event["party"]
+        user_removed = False
+        removed_role = None
+
+        # Try to remove from inscriptions
+        for role, users in event["inscripciones"].items():
+            if interaction.user.id in users:
+                users.remove(interaction.user.id)
+                user_removed = True
+                removed_role = role
+                break
+
+        # If not found in inscriptions, try to remove from waitlist
+        if not user_removed:
+            for role, users in event["waitlist"].items():
+                if interaction.user.id in users:
+                    users.remove(interaction.user.id)
+                    user_removed = True
+                    removed_role = role
+                    break
+
+        if user_removed:
+            # Promote from waitlist if a slot opened in the main inscription
+            if removed_role and len(event["inscripciones"].get(removed_role, [])) < ROAMING_PARTIES[party_type]["roles"][removed_role]:
+                if event["waitlist"].get(removed_role):
+                    promoted_user_id = event["waitlist"][removed_role].pop(0)
+                    event["inscripciones"][removed_role].append(promoted_user_id)
+                    promoted_member = interaction.guild.get_member(promoted_user_id)
+                    if promoted_member:
+                        try:
+                            await promoted_member.send(f"🎉 ¡Has sido movido de la lista de espera al rol **{removed_role}** en el evento de roaming!")
+                        except discord.Forbidden:
+                            print(f"No se pudo enviar DM a {promoted_member.name}. Probablemente tiene los DMs cerrados.")
+
+            await interaction.followup.send("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
+            await interaction.message.edit(embed=create_roaming_embed(party_type, event), view=self.view)
+        else:
+            await interaction.followup.send("❌ No estás inscrito en ningún rol ni en lista de espera en este evento.", ephemeral=True)
+
+
+# --- Clases para CTA (Call To Arms) ---
+
 class CTAEventView(discord.ui.View):
     def __init__(self, event_id, caller_id, event_data):
         super().__init__(timeout=None)
         self.event_id = event_id
         self.caller_id = caller_id
-        self.event_data = event_data # Referencia a la entrada en cta_events
+        self.event_data = event_data
+        self.add_item(CTARoleDropdown(event_id, event_data))
+        self.add_item(CTALeaveButton(event_id))
+        self.add_item(CTASwapGankButton(event_id)) # Nuevo botón de swap de gank
 
-        # Añadir selectores de rol para cada party de kiteo
-        self.add_item(CTARoleSelect(party_type="kiteo1", event_id=event_id, event_data=event_data))
-        self.add_item(CTARoleSelect(party_type="kiteo2", event_id=event_id, event_data=event_data))
-        
-        # Añadir botón de salir y cerrar
-        self.add_item(CTALeaveButton(event_id=event_id))
-        self.add_item(CTACloseButton(event_id=event_id, caller_id=caller_id))
-
-class CTARoleSelect(discord.ui.Select):
-    def __init__(self, party_type: str, event_id: str, event_data: dict):
-        self.party_type = party_type # 'kiteo1' o 'kiteo2'
-        self.event_id = event_id
-        self.event_data = event_data # Referencia al diccionario del evento
-
-        options = []
-        for rol, limite in ROAMING_PARTIES[party_type]["roles"].items():
-            emoji = ROAMING_PARTIES[party_type]["emojis"].get(rol, "")
-            current_insc = len(event_data["inscripciones"][party_type].get(rol, []))
-            options.append(
-                discord.SelectOption(
-                    label=rol,
-                    emoji=emoji,
-                    description=f"Slots: {current_insc}/{limite}"
-                )
-            )
-        super().__init__(
-            placeholder=f"Elige tu rol en {party_type.upper()}",
-            min_values=1,
-            max_values=1,
-            options=options
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        user_id = interaction.user.id
-        rol_elegido = self.values[0]
-
-        # Verificar si el evento sigue activo
-        if self.event_id not in cta_events:
-            return await interaction.followup.send("❌ Este evento de CTA ya no está activo.", ephemeral=True)
-
-        # Buscar y remover al usuario de cualquier otro rol en CUALQUIER party (kiteo1 o kiteo2)
-        user_already_in_role = False
-        for party_key in ["kiteo1", "kiteo2"]:
-            for rol_in_party, users_in_role in self.event_data["inscripciones"][party_key].items():
-                if user_id in users_in_role:
-                    users_in_role.remove(user_id)
-                    user_already_in_role = True
-                    break
-            if user_already_in_role:
-                break
-            for rol_in_party, users_in_waitlist in self.event_data["waitlist"][party_key].items():
-                if user_id in users_in_waitlist:
-                    users_in_waitlist.remove(user_id)
-                    user_already_in_role = True
-                    break
-            if user_already_in_role:
-                break
-
-        # Intentar inscribir en el nuevo rol
-        if len(self.event_data["inscripciones"][self.party_type][rol_elegido]) >= ROAMING_PARTIES[self.party_type]["roles"][rol_elegido]:
-            # Si el rol está lleno, añadir a la lista de espera
-            self.event_data["waitlist"][self.party_type][rol_elegido].append(user_id)
-            await interaction.followup.send(f"✅ Te has unido a la lista de espera para **{rol_elegido}** en **{self.party_type.upper()}**.", ephemeral=True)
-        else:
-            # Si hay espacio, inscribir directamente
-            self.event_data["inscripciones"][self.party_type][rol_elegido].append(user_id)
-            await interaction.followup.send(f"✅ Te has unido como **{rol_elegido}** en **{self.party_type.upper()}**.", ephemeral=True)
-        
-        await update_cta_embed(self.event_id)
-
-class CTALeaveButton(discord.ui.Button):
-    def __init__(self, event_id: str):
-        super().__init__(label="Salir de Rol", style=discord.ButtonStyle.red, custom_id=f"cta_leave_{event_id}")
-        self.event_id = event_id
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-
-        if self.event_id not in cta_events:
-            return await interaction.followup.send("❌ Este evento de CTA ya no está activo.", ephemeral=True)
-
-        event_data = cta_events[self.event_id]
-        user_id = interaction.user.id
-        user_removed = False
-        removed_role_type = None # 'inscripcion' o 'waitlist'
-        removed_party = None
-        removed_role_name = None
-
-        # Buscar en inscripciones y lista de espera de ambas parties
-        for party_key in ["kiteo1", "kiteo2"]:
-            for rol, users in event_data["inscripciones"][party_key].items():
-                if user_id in users:
-                    users.remove(user_id)
-                    user_removed = True
-                    removed_role_type = 'inscripcion'
-                    removed_party = party_key
-                    removed_role_name = rol
-                    break
-            if user_removed:
-                break
-            for rol, users in event_data["waitlist"][party_key].items():
-                if user_id in users:
-                    users.remove(user_id)
-                    user_removed = True
-                    removed_role_type = 'waitlist'
-                    removed_party = party_key
-                    removed_role_name = rol
-                    break
-            if user_removed:
-                break
-
-        if user_removed:
-            # Si un slot principal se abrió, promocionar de la lista de espera
-            if removed_role_type == 'inscripcion' and removed_party and removed_role_name:
-                if len(event_data["inscripciones"][removed_party][removed_role_name]) < ROAMING_PARTIES[removed_party]["roles"][removed_role_name]:
-                    if event_data["waitlist"][removed_party][removed_role_name]:
-                        promoted_user_id = event_data["waitlist"][removed_party][removed_role_name].pop(0)
-                        event_data["inscripciones"][removed_party][removed_role_name].append(promoted_user_id)
-                        promoted_member = interaction.guild.get_member(promoted_user_id)
-                        if promoted_member:
-                            try:
-                                await promoted_member.send(f"🎉 ¡Has sido movido de la lista de espera al rol **{removed_role_name}** en {removed_party.upper()} para la Pelea Obligatoria!")
-                            except discord.Forbidden:
-                                print(f"No se pudo enviar DM a {promoted_member.name}.")
-
-            await interaction.followup.send("✅ Has salido del rol (o de la lista de espera).", ephemeral=True)
-            await update_cta_embed(self.event_id)
-        else:
-            await interaction.followup.send("❌ No estás inscrito en ningún rol ni en lista de espera en este evento de CTA.", ephemeral=True)
-
-class CTACloseButton(discord.ui.Button):
-    def __init__(self, event_id: str, caller_id: int):
-        super().__init__(label="Cerrar Evento CTA", style=discord.ButtonStyle.danger, emoji="🚫", custom_id=f"cta_close_{event_id}")
-        self.event_id = event_id
-        self.caller_id = caller_id
-
-    async def callback(self, interaction: discord.Interaction):
-        # 1. Verificar si el usuario es el caller original
+    @discord.ui.button(label="Cerrar CTA", style=discord.ButtonStyle.danger, emoji="🚫", row=1)
+    async def close_cta_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.caller_id:
-            return await interaction.response.send_message("❌ Solo el que lanzó el evento CTA puede cerrarlo.", ephemeral=True)
+            return await interaction.response.send_message("❌ Solo el que lanzó el evento puede cerrarlo.", ephemeral=True)
 
-        # 2. Verificar si el evento sigue activo
         if self.event_id not in cta_events:
-            return await interaction.response.send_message("❌ Este evento CTA ya no está activo.", ephemeral=True)
+            return await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
 
-        # 3. Obtener el hilo asociado
         thread = interaction.message.thread
-        
-        # 4. Eliminar el hilo de forma segura
         if thread:
             try:
                 if thread.archived:
-                    await thread.edit(archived=False, reason="Desarchivando para eliminar")
+                    await thread.edit(archived=False, reason="Desarchivando para eliminar CTA")
                 await thread.delete()
-                print(f"Hilo del evento CTA {self.event_id} eliminado correctamente.")
+                print(f"Hilo del evento CTA {self.event_id} eliminado.")
             except discord.NotFound:
-                print(f"El hilo del evento CTA {self.event_id} ya no existe.")
+                print(f"Hilo del evento CTA {self.event_id} ya no existe.")
             except discord.Forbidden:
-                print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento CTA {self.event_id}.")
+                print(f"Fallo al eliminar el hilo del evento CTA {self.event_id}. Permisos faltantes.")
             except Exception as e:
                 print(f"Error inesperado al eliminar el hilo del evento CTA {self.event_id}: {e}")
-        else:
-            print("No se encontró un hilo asociado al mensaje del evento CTA.")
 
-        # 5. Eliminar el mensaje principal
         try:
             await interaction.message.delete()
-            print(f"Mensaje del evento CTA {self.event_id} eliminado correctamente.")
+            print(f"Mensaje del evento CTA {self.event_id} eliminado.")
         except discord.Forbidden:
-            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento CTA {self.event_id}.")
+            print(f"Fallo al eliminar el mensaje del evento CTA {self.event_id}. Permisos faltantes.")
             for item in self.children:
                 item.disabled = True
             await interaction.response.edit_message(view=self)
-            return await interaction.followup.send("✅ Evento CTA cerrado, pero no pude borrar el mensaje (permisos faltantes).", ephemeral=True)
+            return await interaction.followup.send("✅ Evento cerrado, pero no pude borrar el mensaje (permisos faltantes).", ephemeral=True)
         except Exception as e:
             print(f"Error inesperado al eliminar el mensaje del evento CTA {self.event_id}: {e}")
             for item in self.children:
                 item.disabled = True
             await interaction.response.edit_message(view=self)
-            return await interaction.followup.send("❌ Ocurrió un error al intentar eliminar el mensaje del evento CTA.", ephemeral=True)
-            
-        # 6. Eliminar el evento del diccionario global
+            return await interaction.followup.send("❌ Ocurrió un error al intentar eliminar el mensaje.", ephemeral=True)
+
         del cta_events[self.event_id]
+        await interaction.response.send_message(f"✅ Evento CTA cerrado y eliminado.", ephemeral=True)
 
-        # 7. Responde a la interacción.
-        await interaction.response.send_message(f"✅ Evento de Pelea Obligatoria cerrado y eliminado.", ephemeral=True)
-
-
-# ====================================================================
-# --- 5. COMANDOS (SLASH Y PREFIX) ---
-# ====================================================================
-
-# --- Comando Slash para cerrar cualquier evento ---
-@bot.tree.command(name="close", description="Cierra un evento de World Boss o Roaming que hayas creado.")
-@discord.app_commands.describe(event_id="ID del evento a cerrar (opcional, si tienes varios activos).")
-async def close_event_slash(interaction: discord.Interaction, event_id: str = None):
-    """
-    Cierra un evento de WB, Roaming o CTA.
-    Si no se especifica un ID, cerrará el evento más reciente que haya creado el usuario.
-    """
-    await interaction.response.defer(ephemeral=True) # MODIFICACIÓN: Defer la respuesta para dar tiempo al bot
-    user_id = interaction.user.id
-    event_found = False
-    message_to_edit = None
-    event_data = None
-    event_type = None
-
-    # --- Intentar cerrar un evento de World Boss ---
-    for eid, data in list(wb_events.items()):
-        if data["caller_id"] == user_id and (event_id is None or eid == event_id):
-            event_found = True
-            event_data = data
-            event_type = "WB"
-            if data.get("message"):
-                channel = bot.get_channel(data["channel_id"])
-                if channel:
-                    try:
-                        message_to_edit = await channel.fetch_message(data["message"].id)
-                    except discord.NotFound:
-                        print(f"Mensaje para el evento WB {eid} no encontrado. Se elimina de la memoria.")
-            del wb_events[eid]
-            if event_id: break # Break if a specific ID was given
-
-    # --- Intentar cerrar un evento de Roaming si no se encontró uno de WB ---
-    if not event_found:
-        for eid, data in list(roaming_events.items()):
-            if data["caller_id"] == user_id and (event_id is None or eid == event_id):
-                event_found = True
-                event_data = data
-                event_type = "Roaming"
-                if data.get("message"):
-                    channel = bot.get_channel(data["channel_id"])
-                    if channel:
-                        try:
-                            message_to_edit = await channel.fetch_message(data["message"].id)
-                        except discord.NotFound:
-                            print(f"Mensaje para el evento Roaming {eid} no encontrado. Se elimina de la memoria.")
-                del roaming_events[eid]
-                if event_id: break # Break if a specific ID was given
-    
-    # --- Intentar cerrar un evento de CTA si no se encontró uno de WB o Roaming ---
-    if not event_found:
-        for eid, data in list(cta_events.items()):
-            if data["caller_id"] == user_id and (event_id is None or eid == event_id):
-                event_found = True
-                event_data = data
-                event_type = "CTA"
-                if data.get("message"):
-                    channel = bot.get_channel(data["channel_id"])
-                    if channel:
-                        try:
-                            message_to_edit = await channel.fetch_message(data["message"].id)
-                        except discord.NotFound:
-                            print(f"Mensaje para el evento CTA {eid} no encontrado. Se elimina de la memoria.")
-                del cta_events[eid]
-                if event_id: break # Break if a specific ID was given
-
-    # --- PROCESAR LA LÓGICA DE CIERRE Y ELIMINACIÓN ---
-    if message_to_edit and event_found and event_data:
-        try:
-            # MODIFICACIÓN CLAVE: Eliminar el hilo y el mensaje.
-            thread = message_to_edit.thread
-            if thread:
-                try:
-                    if thread.archived:
-                        await thread.edit(archived=False, reason="Desarchivando para eliminar")
-                    await thread.delete()
-                    print(f"Hilo del evento {event_id} eliminado por /close.")
-                except discord.NotFound:
-                    print(f"El hilo del evento {event_id} ya no existe.")
-                except discord.Forbidden:
-                    print(f"Error: El bot no tiene el permiso 'Manage Threads' o 'Manage Channels' para eliminar el hilo del evento {event_id}.")
-                except Exception as e:
-                    print(f"Ocurrió un error inesperado al eliminar el hilo del evento {event_id}: {e}")
-            else:
-                print("No se encontró un hilo asociado al mensaje del evento.")
-
-            # Eliminar el mensaje que contiene el embed.
-            await message_to_edit.delete()
-            
-            await interaction.followup.send(f"✅ Evento(s) cerrado(s) y eliminado(s) correctamente.", ephemeral=True)
-
-        except discord.Forbidden:
-            # Si no puede borrar el mensaje, edita la vista para deshabilitarla.
-            print(f"Error: El bot no tiene el permiso 'Manage Messages' para eliminar el mensaje del evento {event_id}.")
-            embed = message_to_edit.embeds[0]
-            embed.title = f"🚫 {event_type.upper()} (CERRADO)"
-            embed.description = "**Este evento ha sido cerrado, pero no se pudo eliminar el mensaje (permisos faltantes).**"
-            embed.color = discord.Color.red()
-            view = discord.ui.View()
-            # Intenta recrear la vista para deshabilitarla
-            if event_type == "WB":
-                view = WB_RoleSelectorView(event_data['boss'], event_id, event_data['caller_id'])
-            elif event_type == "Roaming":
-                view = RoamingEventView(event_data['party'], event_id, event_data['caller_id'], event_data)
-            elif event_type == "CTA":
-                view = CTAEventView(event_id, event_data['caller_id'], event_data) # Pasa event_data completa
-            
-            for item in view.children:
-                item.disabled = True
-            await message_to_edit.edit(embed=embed, view=view)
-            await interaction.followup.send("❌ El evento ha sido cerrado, pero no pude borrar el mensaje (revisa mis permisos).", ephemeral=True)
-
-        except Exception as e:
-            print(f"Error al eliminar el mensaje del evento {event_id}: {e}")
-            await interaction.followup.send("❌ Ocurrió un error al cerrar el evento.", ephemeral=True)
-    elif event_found:
-        # Evento encontrado y eliminado de la memoria, pero el mensaje no pudo ser localizado
-        await interaction.followup.send(f"✅ Evento(s) cerrado(s) correctamente (el mensaje original no pudo ser localizado o eliminado).", ephemeral=True)
-    else:
-        await interaction.followup.send("❌ No se encontró ningún evento activo que hayas creado.", ephemeral=True)
-
-# --- Comando Slash para World Boss ---
-@bot.tree.command(name="wb", description="Crea un evento de World Boss con o sin prioridad.")
-@discord.app_commands.describe(
-    caller="El nombre del caller del World Boss.",
-    boss="El World Boss (elder o eye).",
-    duracion="La duración del evento (ej: '2 horas', '90 minutos').",
-    prios="Número de slots prioritarios (opcional, 1-20).",
-    tiempo_prios="Duración del modo prioridad en minutos (opcional, 1-60).",
-    miembros_prio="Menciona los usuarios prioritarios (ej: '@User1 @User2')."
-)
-async def wb_slash(
-    interaction: discord.Interaction,
-    caller: str,
-    boss: str,
-    duracion: str,
-    prios: int = 0,
-    tiempo_prios: int = 0,
-    miembros_prio: str = None
-):
-    """
-    Crea un evento de World Boss.
-    """
-    await interaction.response.defer() # MODIFICACIÓN: Defer la respuesta para dar tiempo al bot de crear el hilo
-
-    boss_lower = boss.lower()
-    if boss_lower not in WB_BOSS_DATA:
-        return await interaction.followup.send("❌ Boss inválido. Usa `elder` o `eye`.", ephemeral=True)
-
-    # Verificar si el usuario ya tiene un evento activo
-    for event_id, event_data in wb_events.items():
-        if event_data["caller_id"] == interaction.user.id:
-            return await interaction.followup.send("❌ Ya tienes un evento activo. Usa `/close` para cerrarlo primero.", ephemeral=True)
-
-    has_priority = (prios > 0 and tiempo_prios > 0)
-
-    # Parsear los miembros prioritarios si se proporcionaron
-    mentioned_users = []
-    if miembros_prio:
-        for mention in miembros_prio.split():
-            try:
-                match = re.search(r'<@!?(\d+)>', mention)
-                if match:
-                    user_id = int(match.group(1))
-                    user = interaction.guild.get_member(user_id) 
-                    if user:
-                        mentioned_users.append(user)
-            except ValueError:
-                pass
-
-    if has_priority:
-        if interaction.user not in mentioned_users:
-            mentioned_users.insert(0, interaction.user)
-
-        if len(mentioned_users) > prios:
-            return await interaction.followup.send(f"❌ Solo puedes asignar {prios} usuarios prioritarios. Has mencionado {len(mentioned_users)} (incluyéndote).", ephemeral=True)
-
-    event_id = f"WB-{int(time.time())}"
-    description_content = WB_BOSS_DATA[boss_lower]["default_description"].format(duration=duracion)
-
-    # Creamos la entrada del evento en el diccionario global
-    wb_events[event_id] = {
-        "caller": caller,
-        "caller_id": interaction.user.id,
-        "boss": boss_lower,
-        "inscriptions": {role: [] for role in WB_BOSS_DATA[boss_lower]["roles"]},
-        "waitlist": {role: [] for role in WB_BOSS_DATA[boss_lower]["roles"]},
-        "priority_mode": has_priority,
-        "priority_slots": prios if has_priority else 0,
-        "priority_minutes": tiempo_prios if has_priority else 0,
-        "message": None,
-        "channel_id": interaction.channel.id,
-        "description": description_content
-    }
-
-    # Asignamos el evento a una variable local para evitar el UnboundLocalError
-    event = wb_events[event_id]
-
-    embed_description = description_content
-    footer_text = ""
-    embed_color = 0x8B0000
-
-    if has_priority:
-        priority_expiry_time = time.time() + (tiempo_prios * 60)
-        wb_priority_users[event_id] = {
-            "users": [user.id for user in mentioned_users],
-            "expiry": priority_expiry_time,
-            "slots": prios,
-            "minutes": tiempo_prios
-        }
-        embed_description += (
-            f"\n\n🎯 **Sistema de Prioridad Activado**\n"
-            f"⏳ **Usuarios prioritarios:** {', '.join([f'<@{uid}>' for uid in wb_priority_users[event_id]['users']])}\n"
-            f"🕒 **Bloqueo termina en:** <t:{int(priority_expiry_time)}:R>\n"
-            f"📊 **Slots usados:** {len(mentioned_users)}/{prios}"
+class CTARoleDropdown(discord.ui.Select):
+    def __init__(self, event_id, event_data):
+        self.event_id = event_id
+        self.event_data = event_data
+        
+        options = []
+        for party_name in ["kiteo1", "kiteo2", "roaming_pocho"]: # Added "roaming_pocho"
+            if party_name in ROAMING_PARTIES:
+                party_data = ROAMING_PARTIES[party_name]
+                for role_name in party_data["roles"]:
+                    options.append(
+                        discord.SelectOption(
+                            label=f"{party_name.upper()} - {role_name}",
+                            value=f"{party_name}-{role_name}",
+                            emoji=party_data["emojis"].get(role_name, "❔")
+                        )
+                    )
+        
+        super().__init__(
+            placeholder="Elige tu rol para el CTA",
+            options=options,
+            max_values=1
         )
-        footer_text = "🔒 Solo usuarios prioritarios pueden anotarse"
-        embed_color = 0xFF4500
-        view_disabled = False
-    else:
-        footer_text = "🔓 Todos pueden anotarse"
-        embed_color = 0x00FF00
-        view_disabled = False
 
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        if self.event_id not in cta_events:
+            return await interaction.followup.send("❌ Este evento CTA ya no está activo.", ephemeral=True)
+
+        event = cta_events[self.event_id]
+        party_name, selected_role = self.values[0].split('-', 1)
+
+        # Check if user is already in any role across all CTA parties
+        for p_name in ["kiteo1", "kiteo2", "roaming_pocho"]: # Added "roaming_pocho"
+            for r_name, users in event["inscripciones"].get(p_name, {}).items():
+                if interaction.user.id in users:
+                    return await interaction.followup.send(
+                        f"❌ Ya estás inscrito como **{p_name.upper()} - {r_name}**. Usa el botón 'Salir de Rol' primero.",
+                        ephemeral=True
+                    )
+            for r_name, users in event["waitlist"].get(p_name, {}).items():
+                if interaction.user.id in users:
+                    return await interaction.followup.send(
+                        f"❌ Ya estás en la lista de espera para **{p_name.upper()} - {r_name}**. Usa el botón 'Salir de Rol' primero.",
+                        ephemeral=True
+                    )
+
+        party_data = ROAMING_PARTIES[party_name]
+        
+        # Ensure the nested dictionaries exist
+        event["inscripciones"].setdefault(party_name, {})
+        event["waitlist"].setdefault(party_name, {})
+
+        # Check if the specific role is full
+        if len(event["inscripciones"][party_name].get(selected_role, [])) >= party_data["roles"].get(selected_role, 1):
+            event["waitlist"][party_name].setdefault(selected_role, []).append(interaction.user.id)
+            await interaction.followup.send(f"✅ El rol **{party_name.upper()} - {selected_role}** está lleno. Te has unido a la lista de espera.", ephemeral=True)
+        else:
+            event["inscripciones"][party_name].setdefault(selected_role, []).append(interaction.user.id)
+            await interaction.followup.send(f"✅ Te has unido como **{party_name.upper()} - {selected_role}**", ephemeral=True)
+        
+        await update_cta_embed(self.event_id)
+
+class CTALeaveButton(discord.ui.Button):
+    def __init__(self, event_id):
+        super().__init__(label="Salir de Rol", style=discord.ButtonStyle.red, custom_id=f"cta_leave_role_{event_id}")
+        self.event_id = event_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        if self.event_id not in cta_events:
+            return await interaction.followup.send("❌ Este evento CTA ya no está activo.", ephemeral=True)
+
+        event = cta_events[self.event_id]
+        user_removed = False
+        removed_party = None
+        removed_role = None
+
+        # Try to remove from inscriptions
+        for p_name, roles_data in event["inscripciones"].items():
+            for r_name, users in roles_data.items():
+                if interaction.user.id in users:
+                    users.remove(interaction.user.id)
+                    user_removed = True
+                    removed_party = p_name
+                    removed_role = r_name
+                    break
+            if user_removed:
+                break
+
+        # If not found in inscriptions, try to remove from waitlist
+        if not user_removed:
+            for p_name, roles_data in event["waitlist"].items():
+                for r_name, users in roles_data.items():
+                    if interaction.user.id in users:
+                        users.remove(interaction.user.id)
+                        user_removed = True
+                        removed_party = p_name
+                        removed_role = r_name
+                        break
+                if user_removed:
+                    break
+
+        if user_removed:
+            # Promote from waitlist if a slot opened in the main inscription
+            if removed_party and removed_role:
+                party_data = ROAMING_PARTIES[removed_party]
+                if len(event["inscripciones"][removed_party].get(removed_role, [])) < party_data["roles"].get(removed_role, 1):
+                    if event["waitlist"][removed_party].get(removed_role):
+                        promoted_user_id = event["waitlist"][removed_party][removed_role].pop(0)
+                        event["inscripciones"][removed_party][removed_role].append(promoted_user_id)
+                        promoted_member = interaction.guild.get_member(promoted_user_id)
+                        if promoted_member:
+                            try:
+                                await promoted_member.send(f"🎉 ¡Has sido movido de la lista de espera al rol **{removed_party.upper()} - {removed_role}** en el evento CTA!")
+                            except discord.Forbidden:
+                                print(f"No se pudo enviar DM a {promoted_member.name}. Probablemente tiene los DMs cerrados.")
+
+            await interaction.followup.send("✅ Has salido del rol (o de la lista de espera) del CTA.", ephemeral=True)
+            await update_cta_embed(self.event_id)
+        else:
+            await interaction.followup.send("❌ No estás inscrito en ningún rol ni en lista de espera en este evento CTA.", ephemeral=True)
+
+class CTASwapGankButton(discord.ui.Button):
+    def __init__(self, event_id):
+        super().__init__(label="Swap de Gank", style=discord.ButtonStyle.blurple, custom_id=f"cta_swap_gank_{event_id}")
+        self.event_id = event_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        if self.event_id not in cta_events:
+            return await interaction.followup.send("❌ Este evento CTA ya no está activo.", ephemeral=True)
+
+        event = cta_events[self.event_id]
+        
+        # Toggle swap_gank status
+        event["swap_gank"] = not event.get("swap_gank", False)
+        
+        status_text = "activado" if event["swap_gank"] else "desactivado"
+        await interaction.followup.send(f"✅ Swap de Gank ha sido {status_text} para este CTA.", ephemeral=True)
+        await update_cta_embed(self.event_id)
+
+# ====================================================================
+# --- 5. COMANDOS DEL BOT ---
+# ====================================================================
+
+# --- Comandos para World Boss (WB) ---
+@bot.command(name="wb")
+async def wb_event(ctx, boss_name: str, duration: str = "2h", priority_slots: int = 0, *priority_users: discord.Member):
+    if boss_name.lower() not in WB_BOSS_DATA:
+        return await ctx.send(f"❌ Jefe '{boss_name}' no reconocido. Jefes disponibles: {', '.join(WB_BOSS_DATA.keys())}")
+
+    boss_info = WB_BOSS_DATA[boss_name.lower()]
+    event_id = int(time.time()) # Usar timestamp como ID único
+
+    # Inicializar inscripciones y lista de espera
+    inscriptions = {role: [] for role in boss_info["roles"]}
+    waitlist = {role: [] for role in boss_info["roles"]}
+
+    description = boss_info["default_description"].format(duration=duration)
+    
+    # Crear el embed
     embed = discord.Embed(
-        title=f"🌍 WORLD BOSS: {WB_BOSS_DATA[boss_lower]['name']} (Caller: {caller})",
-        description=embed_description,
-        color=embed_color
+        title=f"💀 WORLD BOSS {boss_info['name'].upper()}",
+        description=description,
+        color=0x00FF00 # Verde por defecto
     )
-    embed.set_footer(text=footer_text)
+    embed.set_footer(text="🔓 Todos pueden anotarse")
 
-    for role in WB_BOSS_DATA[boss_lower]["roles"]:
-        players_in_role = ", ".join([f"<@{uid}>" for uid in event["inscriptions"][role]])
-        waitlist_players = ", ".join([f"<@{uid}>" for uid in event["waitlist"][role]])
-
-        role_status = ""
-        if players_in_role:
-            role_status += f"👥 {players_in_role}"
-        if waitlist_players:
-            role_status += f"\n⏳ Espera: {waitlist_players}"
-
-        if not role_status:
-            role_status = "🚫 Vacío"
-
+    for role in boss_info["roles"]:
         embed.add_field(
-            name=f"{WB_BOSS_DATA[boss_lower]['emojis'].get(role)} {role} ({len(event['inscriptions'][role])}/{WB_BOSS_DATA[boss_lower]['roles'][role]} +{len(event['waitlist'][role])} en espera)",
-            value=role_status,
+            name=f"{boss_info['emojis'].get(role)} {role} (0/{boss_info['roles'][role]})",
+            value="🚫 Vacío",
             inline=False
         )
-
-    view = WB_RoleSelectorView(boss_lower, event_id, interaction.user.id, disabled=view_disabled)
-
-    # MODIFICACIÓN: Enviar el mensaje usando `followup.send` después de diferir
-    await interaction.followup.send(embed=embed, view=view)
     
-    # MODIFICACIÓN: Obtener el mensaje después de enviarlo y crear el hilo
-    message = await interaction.original_response()
-    event["message"] = message
+    # Enviar el mensaje y guardar la referencia
+    message = await ctx.send(embed=embed)
 
-    print("\n--- Intentando crear el hilo para /wb...")
-    print(f"Objeto del mensaje: {message}")
+    # Crear el hilo
+    thread = await message.create_thread(
+        name=f"WB {boss_name.upper()} - {datetime.now().strftime('%H:%M')}",
+        auto_archive_duration=1440 # 24 horas
+    )
+    # Ping al caller en el hilo
+    await thread.send(f"<@{ctx.author.id}> ¡Tu evento de World Boss ha sido creado! Usa este hilo para la coordinación.")
 
-    try:
-        thread = await message.create_thread(name=f"💬 Discusión sobre WB {WB_BOSS_DATA[boss_lower]['name']}")
-        print(f"Hilo creado con éxito: {thread.name}")
-    except discord.Forbidden:
-        print("ERROR: No se pudo crear el hilo. Asegúrate de que el bot tenga el permiso 'Manage Threads'.")
-    except Exception as e:
-        print(f"Ocurrió un error inesperado al crear el hilo: {e}")
+    # Guardar el evento
+    wb_events[event_id] = {
+        "boss": boss_name.lower(),
+        "message": message,
+        "thread": thread,
+        "caller_id": ctx.author.id,
+        "inscriptions": inscriptions,
+        "waitlist": waitlist,
+        "description": description,
+        "priority_mode": False
+    }
 
-# --- Comandos de Prefijo para Roaming ---
-@bot.command(name='roaming', aliases=['r'])
-async def roaming(ctx, party: str, tier: str = "T8", ip: int = 1400, *args):
-    """
-    Crea un evento de roaming con hora, swap de gank y caller opcionales.
-    Ej: !r kiteo1 T8 1400 3.30 si Pepito
-    Ej: !r kiteo1 T8 1400 no
-    Ej: !r brawl2 T8 1450 IsaelOC
-    """
-    party_lower = party.lower()
-    if party_lower not in ROAMING_PARTIES:
-        return await ctx.send("❌ Party inválido. Opciones disponibles: " + ", ".join(ROAMING_PARTIES.keys()))
+    # Configurar modo de prioridad si aplica
+    if priority_slots > 0 and priority_users:
+        priority_user_ids = [user.id for user in priority_users]
+        wb_priority_users[event_id] = {
+            "users": priority_user_ids,
+            "expiry": time.time() + WB_EVENT_TIMEOUT, # Duración de la prioridad
+            "slots": priority_slots
+        }
+        wb_events[event_id]["priority_mode"] = True
+        await update_wb_embed(event_id) # Actualizar embed para reflejar prioridad
 
-    # --- LÓGICA DE PARSEO FLEXIBLE DE ARGUMENTOS ---
-    # Inicializamos los valores opcionales
-    time_str = None
-    swap_gank_status = False
-    caller_display = ctx.author.display_name
+    # Enviar la vista con botones
+    view = WB_RoleSelectorView(boss_name.lower(), event_id, ctx.author.id, disabled=wb_events[event_id]["priority_mode"])
+    await message.edit(view=view)
+    await ctx.send(f"✅ Evento de World Boss '{boss_info['name']}' creado. ID: {event_id}", ephemeral=True)
+
+
+@bot.command(name="prioritywb")
+async def priority_wb(ctx, event_id: int, slots: int, *users: discord.Member):
+    if event_id not in wb_events:
+        return await ctx.send("❌ ID de evento WB no encontrado.", ephemeral=True)
+
+    event = wb_events[event_id]
+    if ctx.author.id != event["caller_id"]:
+        return await ctx.send("❌ Solo el creador del evento puede usar este comando.", ephemeral=True)
+
+    if not users:
+        return await ctx.send("❌ Debes mencionar al menos un usuario para darle prioridad.", ephemeral=True)
+
+    user_ids = [user.id for user in users]
+    wb_priority_users[event_id] = {
+        "users": user_ids,
+        "expiry": time.time() + WB_EVENT_TIMEOUT, # 2 horas de prioridad
+        "slots": slots
+    }
+    event["priority_mode"] = True
+    await update_wb_embed(event_id)
+    await ctx.send(f"✅ Prioridad de {slots} slots activada para {len(users)} usuarios en el evento WB ID: {event_id}. Expira en 2 horas.", ephemeral=True)
+
+@bot.command(name="clearprioritywb")
+async def clear_priority_wb(ctx, event_id: int):
+    if event_id not in wb_events:
+        return await ctx.send("❌ ID de evento WB no encontrado.", ephemeral=True)
+
+    event = wb_events[event_id]
+    if ctx.author.id != event["caller_id"]:
+        return await ctx.send("❌ Solo el creador del evento puede usar este comando.", ephemeral=True)
+
+    if event_id in wb_priority_users:
+        del wb_priority_users[event_id]
+        event["priority_mode"] = False
+        await update_wb_embed(event_id)
+        await ctx.send(f"✅ Prioridad desactivada para el evento WB ID: {event_id}.", ephemeral=True)
+    else:
+        await ctx.send(f"ℹ️ El evento WB ID: {event_id} no tenía prioridad activa.", ephemeral=True)
+
+# --- Comandos para Roaming Parties ---
+@bot.command(name="roaming")
+async def roaming_party(ctx, party_type: str, tier_min: str, ip_min: int, time_val: str = None, swap_gank: str = "no", *caller_name_args):
+    party_type = party_type.lower()
+    if party_type not in ROAMING_PARTIES:
+        return await ctx.send(f"❌ Tipo de roaming '{party_type}' no reconocido. Tipos disponibles: {', '.join(ROAMING_PARTIES.keys())}", ephemeral=True)
     
-    # Procesamos los argumentos adicionales (*args)
-    # Creamos una lista temporal para manipular los argumentos
-    temp_args = list(args)
+    caller_display = get_roaming_caller_info(ctx, caller_name_args)
+    swap_gank_bool = swap_gank.lower() in ('si', 'sí', 'y', 'yes')
 
-    # 1. Buscar el flag de swap de gank ('si'/'no') de forma flexible
-    swap_keywords_si = ('si', 'sí', 'yes', 'y')
-    swap_keywords_no = ('no', 'n')
+    event_id = int(time.time()) # Unique ID based on timestamp
     
-    found_swap_arg = False
-    for i, arg in enumerate(temp_args):
-        if arg.lower() in swap_keywords_si:
-            swap_gank_status = True
-            temp_args.pop(i)
-            found_swap_arg = True
-            break
-        elif arg.lower() in swap_keywords_no:
-            swap_gank_status = False # El valor por defecto, pero lo dejamos explícito
-            temp_args.pop(i)
-            found_swap_arg = True
-            break
+    # Initialize inscriptions and waitlist for each role in the selected party type
+    inscriptions = {role: [] for role in ROAMING_PARTIES[party_type]["roles"]}
+    waitlist = {role: [] for role in ROAMING_PARTIES[party_type]["roles"]}
 
-    # 2. Buscar el argumento de la hora (que parece un número flotante, ej: '3.30')
-    found_time_arg = False
-    for i, arg in enumerate(temp_args):
-        # Usamos regex para verificar si es un número flotante como '3.30'
-        if re.match(r'^\d+(\.\d+)?$', arg):
-            time_str = temp_args.pop(i)
-            found_time_arg = True
-            break
-            
-    # 3. Lo que queda es el nombre del caller (o nada)
-    if temp_args:
-        caller_display = ' '.join(temp_args) # Unimos el resto como el nombre del caller
-
-    event_id = f"{ctx.author.id}-{int(time.time())}"
-
-    # Inicializa el diccionario de inscripciones y la lista de espera
-    inscripciones_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
-    waitlist_dict = {rol: [] for rol in ROAMING_PARTIES[party_lower]["roles"]}
-
-    # Crea la entrada en el diccionario global
-    roaming_events[event_id] = {
-        "event_id": event_id,
+    event_data = {
+        "party": party_type,
         "caller_id": ctx.author.id,
         "caller_display": caller_display,
-        "channel_id": ctx.channel.id,
-        "party": party_lower,
-        "tier_min": tier.upper(),
-        "ip_min": ip,
-        "time": time_str,  # <-- NUEVO CAMPO AÑADIDO
-        "swap_gank": swap_gank_status,  # <-- CAMPO ACTUALIZADO
-        "start_time": time.time(),
-        "message": None,
-        "inscripciones": inscripciones_dict,
-        "waitlist": waitlist_dict
+        "tier_min": tier_min,
+        "ip_min": ip_min,
+        "time": time_val,
+        "swap_gank": swap_gank_bool,
+        "inscripciones": inscriptions,
+        "waitlist": waitlist,
+        "event_id": event_id
+    }
+    
+    embed = create_roaming_embed(party_type, event_data)
+    message = await ctx.send(embed=embed)
+
+    roaming_events[event_id] = {
+        "message": message,
+        "caller_id": ctx.author.id,
+        "party": party_type,
+        "event_data": event_data # Store the full event data
+    }
+    
+    view = RoamingRoleSelectorView(party_type, event_id, ctx.author.id)
+    await message.edit(view=view)
+    await ctx.send(f"✅ Evento de roaming '{party_type}' creado. ID: {event_id}", ephemeral=True)
+
+# --- Comandos para CTA (Call to Arms) ---
+@bot.command(name="cta")
+async def cta_event(ctx, mass_time: str):
+    event_id = int(time.time())
+    
+    # Inicializar inscripciones y listas de espera para cada party dentro del CTA
+    inscripciones = {
+        "kiteo1": {role: [] for role in ROAMING_PARTIES["kiteo1"]["roles"]},
+        "kiteo2": {role: [] for role in ROAMING_PARTIES["kiteo2"]["roles"]},
+        "roaming_pocho": {role: [] for role in ROAMING_PARTIES["roaming_pocho"]["roles"]}, # Added "roaming_pocho"
+        # Agrega aquí otras parties que quieras incluir en el CTA
+    }
+    waitlist = {
+        "kiteo1": {role: [] for role in ROAMING_PARTIES["kiteo1"]["roles"]},
+        "kiteo2": {role: [] for role in ROAMING_PARTIES["kiteo2"]["roles"]},
+        "roaming_pocho": {role: [] for role in ROAMING_PARTIES["roaming_pocho"]["roles"]}, # Added "roaming_pocho"
+        # Agrega aquí otras parties que quieras incluir en el CTA
     }
 
-    # Crea el embed y la vista con el menú desplegable y los botones
-    embed = create_roaming_embed(party_lower, roaming_events[event_id])
-
-    # Usa la clase de vista con los botones
-    vista_botones = RoamingEventView(
-        party=party_lower,
-        event_id=event_id,
-        caller_id=ctx.author.id,
-        event_data=roaming_events[event_id]
-    )
-
-    # Envía el mensaje con la mención de rol y la vista
-    mensaje_mencion = f"**¡Roaming de {party_lower.upper()} ha sido lanzado por {ctx.author.mention}!** "
-    mensaje = await ctx.send(content=mensaje_mencion, embed=embed, view=vista_botones)
-
-    # Guarda el objeto del mensaje para poder editarlo después
-    roaming_events[event_id]["message"] = mensaje
-
-    print("\n--- Intentando crear el hilo para !roaming...")
-    print(f"Objeto del mensaje: {mensaje}")
-
-    try:
-        thread = await mensaje.create_thread(name=f"💬 Discusión sobre Roaming {party_lower.upper()}")
-        print(f"Hilo creado con éxito: {thread.name}")
-    except discord.Forbidden:
-        print("ERROR: No se pudo crear el hilo. Asegúrate de que el bot tenga el permiso 'Manage Threads'.")
-    except Exception as e:
-        print(f"Ocurrió un error inesperado al crear el hilo: {e}")
-
-@bot.command(name='cta')
-async def cta(ctx, mass_time: str):
-    """
-    Crea un evento interactivo de Pelea Obligatoria con selector de roles
-    para Kiteo Onda 1 y Kiteo Onda 2, incluyendo la hora de masseo.
-    Uso: !cta <hora_utc> (ej. !cta 20)
-    """
-    # Verificar si el usuario ya tiene un evento CTA activo
-    for event_id, event_data in cta_events.items():
-        if event_data["caller_id"] == ctx.author.id:
-            return await ctx.send("❌ Ya tienes un evento CTA activo. Usa `/close` para cerrarlo primero.", ephemeral=True)
-
-    event_id = f"CTA-{int(time.time())}"
-
-    # Inicializar inscripciones y listas de espera para ambas parties de kiteo
-    inscripciones_dict = {
-        "kiteo1": {rol: [] for rol in ROAMING_PARTIES["kiteo1"]["roles"]},
-        "kiteo2": {rol: [] for rol in ROAMING_PARTIES["kiteo2"]["roles"]}
-    }
-    waitlist_dict = {
-        "kiteo1": {rol: [] for rol in ROAMING_PARTIES["kiteo1"]["roles"]},
-        "kiteo2": {rol: [] for rol in ROAMING_PARTIES["kiteo2"]["roles"]}
-    }
-
-    cta_events[event_id] = {
+    event_data = {
         "event_id": event_id,
         "caller_id": ctx.author.id,
-        "channel_id": ctx.channel.id,
         "mass_time": mass_time,
-        "start_time": time.time(),
-        "message": None,
-        "inscripciones": inscripciones_dict,
-        "waitlist": waitlist_dict
+        "inscripciones": inscripciones,
+        "waitlist": waitlist,
+        "swap_gank": False # Por defecto, swap de gank desactivado para CTA
     }
 
-    # Crear el embed inicial
-    embed = create_cta_embed(cta_events[event_id])
+    embed = create_cta_embed(event_data)
+    message = await ctx.send(embed=embed)
 
-    # Crear la vista con los selectores y botones
-    view = CTAEventView(event_id, ctx.author.id, cta_events[event_id])
+    # Crear el hilo para el CTA
+    thread = await message.create_thread(
+        name=f"CTA - {mass_time} UTC",
+        auto_archive_duration=1440 # 24 horas
+    )
+    await thread.send(f"<@{ctx.author.id}> ¡Tu evento CTA ha sido creado! Coordina a tus equipos aquí.")
 
-    # Enviar el mensaje
-    message = await ctx.send(content="**📢 ¡Pelea Obligatoria Lanzada! ¡Anótense en sus roles!**", embed=embed, view=view)
-    cta_events[event_id]["message"] = message
+    cta_events[event_id] = {
+        "message": message,
+        "thread": thread,
+        "caller_id": ctx.author.id,
+        "mass_time": mass_time,
+        "inscripciones": inscripciones,
+        "waitlist": waitlist,
+        "swap_gank": False # Asegurarse que se guarde el estado inicial
+    }
 
-    print("\n--- Intentando crear el hilo para !cta...")
-    print(f"Objeto del mensaje: {message}")
+    view = CTAEventView(event_id, ctx.author.id, event_data)
+    await message.edit(view=view)
+    await ctx.send(f"✅ Evento CTA creado para las {mass_time} UTC. ID: {event_id}", ephemeral=True)
 
-    try:
-        thread = await message.create_thread(name=f"💬 Discusión sobre Pelea Obligatoria ({mass_time} UTC)")
-        print(f"Hilo creado con éxito: {thread.name}")
-    except discord.Forbidden:
-        print("ERROR: No se pudo crear el hilo. Asegúrate de que el bot tenga el permiso 'Manage Threads'.")
-    except Exception as e:
-        print(f"Ocurrió un error inesperado al crear el hilo: {e}")
-
-
-# ====================================================================
-# --- 6. EVENTOS DEL BOT ---
-# ====================================================================
-
-@bot.event
-async def on_ready():
-    """Se ejecuta cuando el bot está listo y conectado a Discord."""
-    print(f'Logged in as {bot.user.name} ({bot.user.id})')
-    print('------')
-
-    # --- 1. Sincronizar comandos slash ---
-    try:
-        # Sincroniza los comandos de la aplicación con Discord
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
-    except Exception as e:
-        print(f"Failed to sync commands: {e}")
-
-    # --- 2. Reanudar vistas persistentes ---
-    try:
-        # Re-añade las vistas para cualquier evento roaming activo
-        for event_id, event_data in roaming_events.items():
-            if event_data.get("message"):
-                channel = bot.get_channel(event_data["channel_id"])
-                if channel:
-                    try:
-                        message = await channel.fetch_message(event_data["message"].id)
-                        view = RoamingEventView(
-                            party=event_data["party"],
-                            event_id=event_id,
-                            caller_id=event_data["caller_id"],
-                            event_data=event_data
-                        )
-                        bot.add_view(view, message_id=message.id)
-                        print(f"Re-added Roaming view for event {event_id}")
-                    except discord.NotFound:
-                        print(f"Message for Roaming event {event_id} not found. Skipping.")
-                else:
-                    print(f"Channel for Roaming event {event_id} not found. Skipping.")
-        
-        # Re-añade las vistas para cualquier evento CTA activo
-        for event_id, event_data in cta_events.items():
-            if event_data.get("message"):
-                channel = bot.get_channel(event_data["channel_id"])
-                if channel:
-                    try:
-                        message = await channel.fetch_message(event_data["message"].id)
-                        view = CTAEventView(
-                            event_id=event_id,
-                            caller_id=event_data["caller_id"],
-                            event_data=event_data
-                        )
-                        bot.add_view(view, message_id=message.id)
-                        print(f"Re-added CTA view for event {event_id}")
-                    except discord.NotFound:
-                        print(f"Message for CTA event {event_id} not found. Skipping.")
-                else:
-                    print(f"Channel for CTA event {event_id} not found. Skipping.")
-
-    except Exception as e:
-        print(f"Failed to re-add views: {e}")
-
-    # --- 3. Iniciar tareas en bucle ---
-    # Es crucial iniciar las tareas *dentro* de on_ready, donde el event loop ya está corriendo.
-    if not cleanup_roaming_events.is_running():
-        cleanup_roaming_events.start()
-        print("Started cleanup_roaming_events task.")
-    if not cleanup_cta_events.is_running(): # Iniciar tarea de limpieza CTA
-        cleanup_cta_events.start()
-        print("Started cleanup_cta_events task.")
-    # --- AÑADE ESTA ÚNICA LÍNEA PARA IMPORTAR EL COG ---
-    try:
-        await bot.load_extension('pi_cog')
-        print("Successfully loaded pi_cog.")
-    except Exception as e:
-        print(f"Failed to load pi_cog: {e}")
-        
-@bot.event
-async def on_message(message):
-    if message.author == bot.user:
-        return
-    await bot.process_commands(message)
 
 # ====================================================================
-# --- 7. TAREAS EN BUCLE (LOOP TASKS) ---
+# --- 6. TAREAS EN BUCLE (LIMPIEZA) ---
 # ====================================================================
 
-# Tarea para limpiar eventos de roaming antiguos
-@tasks.loop(minutes=30)
-async def cleanup_roaming_events():
-    now = time.time()
+@tasks.loop(minutes=5)
+async def cleanup_wb_events():
+    current_time = time.time()
     events_to_remove = []
-    for event_id, event_data in roaming_events.items():
-        # Clean up roaming events older than the timeout
-        if (now - event_data["start_time"]) > ROAMING_EVENT_TIMEOUT:
+    for event_id, event_data in list(wb_events.items()): # Iterate over a copy
+        if current_time - event_data["message"].created_at.timestamp() > WB_EVENT_TIMEOUT:
+            events_to_remove.append(event_id)
+            try:
+                # Intenta eliminar el mensaje si aún existe
+                if event_data["message"]:
+                    await event_data["message"].delete()
+                    print(f"Mensaje del evento WB expirado {event_id} eliminado.")
+            except discord.NotFound:
+                print(f"Mensaje del evento WB expirado {event_id} ya no existe.")
+            except discord.Forbidden:
+                print(f"Fallo al eliminar el mensaje del evento WB expirado {event_id}. Permisos faltantes.")
+            except Exception as e:
+                print(f"Error inesperado al eliminar el mensaje del evento WB expirado {event_id}: {e}")
+            
+            # Intenta eliminar el hilo asociado
+            if event_data.get("thread"):
+                try:
+                    if event_data["thread"].archived:
+                        await event_data["thread"].edit(archived=False, reason="Desarchivando para eliminar por expiración WB")
+                    await event_data["thread"].delete()
+                    print(f"Hilo del evento WB expirado {event_id} eliminado.")
+                except discord.NotFound:
+                    print(f"Hilo del evento WB expirado {event_id} ya no existe.")
+                except discord.Forbidden:
+                    print(f"Fallo al eliminar el hilo del evento WB expirado {event_id}. Permisos faltantes.")
+                except Exception as e:
+                    print(f"Error inesperado al eliminar el hilo del evento WB expirado {event_id}: {e}")
+
+    for event_id in events_to_remove:
+        if event_id in wb_events:
+            del wb_events[event_id]
+        if event_id in wb_priority_users:
+            del wb_priority_users[event_id]
+
+@tasks.loop(minutes=5)
+async def cleanup_roaming_events():
+    current_time = time.time()
+    events_to_remove = []
+    for event_id, event_data in list(roaming_events.items()): # Iterate over a copy
+        # Asegúrate de que event_data["message"] existe y tiene created_at
+        if event_data.get("message") and hasattr(event_data["message"], "created_at"):
+            if current_time - event_data["message"].created_at.timestamp() > ROAMING_EVENT_TIMEOUT:
+                events_to_remove.append(event_id)
+                try:
+                    await event_data["message"].delete()
+                    print(f"Mensaje del evento roaming expirado {event_id} eliminado.")
+                except discord.NotFound:
+                    print(f"Mensaje del evento roaming expirado {event_id} ya no existe.")
+                except discord.Forbidden:
+                    print(f"Fallo al eliminar el mensaje del evento roaming expirado {event_id}. Permisos faltantes.")
+                except Exception as e:
+                    print(f"Error inesperado al eliminar el mensaje del evento roaming expirado {event_id}: {e}")
+        else: # Si el mensaje no existe o no tiene created_at, también lo consideramos para eliminar
+            print(f"Evento roaming {event_id} sin mensaje o sin timestamp, marcando para eliminación.")
             events_to_remove.append(event_id)
 
     for event_id in events_to_remove:
-        event_data = roaming_events.get(event_id)
-        if event_data:
-            print(f"Cleaning up roaming event {event_id} due to timeout.")
-            
-            # MODIFICACIÓN CLAVE: Borrar el mensaje y el hilo.
-            message = event_data.get("message")
-            if message:
-                try:
-                    # Intenta borrar el hilo asociado
-                    thread = message.thread
-                    if thread:
-                        if thread.archived:
-                            await thread.edit(archived=False, reason="Desarchivando para eliminar por expiración")
-                        await thread.delete()
-                        print(f"Hilo del evento expirado {event_id} eliminado.")
-                    
-                    # Intenta borrar el mensaje
-                    await message.delete()
-                    print(f"Mensaje del evento expirado {event_id} eliminado.")
-                except discord.NotFound:
-                    print(f"Mensaje o hilo del evento expirado {event_id} ya no existe.")
-                except discord.Forbidden:
-                    print(f"Fallo al eliminar el mensaje/hilo del evento expirado {event_id}. Permisos faltantes.")
-                except Exception as e:
-                    print(f"Error inesperado al eliminar el mensaje del evento expirado {event_id}: {e}")
-            
-            # Eliminar de la memoria del bot
+        if event_id in roaming_events:
             del roaming_events[event_id]
 
-# Nueva tarea para limpiar eventos CTA antiguos
-@tasks.loop(minutes=30)
+@tasks.loop(minutes=5)
 async def cleanup_cta_events():
-    now = time.time()
+    current_time = time.time()
     events_to_remove = []
-    for event_id, event_data in cta_events.items():
-        if (now - event_data["start_time"]) > CTA_EVENT_TIMEOUT:
-            events_to_remove.append(event_id)
-
-    for event_id in events_to_remove:
-        event_data = cta_events.get(event_id)
-        if event_data:
-            print(f"Cleaning up CTA event {event_id} due to timeout.")
-            message = event_data.get("message")
-            if message:
+    for event_id, event_data in list(cta_events.items()):
+        if event_data.get("message") and hasattr(event_data["message"], "created_at"):
+            if current_time - event_data["message"].created_at.timestamp() > CTA_EVENT_TIMEOUT:
+                events_to_remove.append(event_id)
                 try:
-                    thread = message.thread
+                    message = event_data["message"]
+                    thread = event_data.get("thread")
                     if thread:
                         if thread.archived:
                             await thread.edit(archived=False, reason="Desarchivando para eliminar por expiración CTA")
@@ -1759,6 +1468,12 @@ async def cleanup_cta_events():
                     print(f"Fallo al eliminar el mensaje/hilo del evento CTA expirado {event_id}. Permisos faltantes.")
                 except Exception as e:
                     print(f"Error inesperado al eliminar el mensaje del evento CTA expirado {event_id}: {e}")
+            else:
+                print(f"Evento CTA {event_id} sin mensaje o sin timestamp, marcando para eliminación.")
+                events_to_remove.append(event_id)
+
+    for event_id in events_to_remove:
+        if event_id in cta_events:
             del cta_events[event_id]
 
 
