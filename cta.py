@@ -11,79 +11,90 @@ import re
 # ====================================================================
 
 cta_events = {} # Nuevo diccionario para eventos CTA
-CTA_EVENT_TIMEOUT = 7200 # 2 horas
+CTA_EVENT_TIMEOUT = 7200 # 2 horas (tiempo de vida del evento CTA)
 
-# Roles y emojis combinados de kiteo1 y kiteo2 de roaming.py
-ALL_ALBION_ROLES = {
-    "HOJ": "<:ManodeJusticia:1290858364129247242>",
-    "PESADA": "<:stoper:1290858463135662080>",
-    "LECHO PEEL": "<:stoper:1290858463135662080>",
-    "LECHO SUP": "<:stoper:1290858463135662080>",
-    "GA": "<:GranArcano:1337861969931407411>",
-    "LOCUS": "<:Locus:1291467422238249043>",
-    "JURADORES": "<:Maracas:1290858583965175828>",
-    "ENRAIZADO": "<:Enraizado:1290879541073678397>",
-    "LIFECURSED": "<:Maldi:1291467716229730415>",
-    "OCULTO": "<:Oculto:1337862058779218026>",
-    "ROMPERREINO": "<:RompeReino:1290881352182399017>",
-    "CAZAESPÍRITUS": "<:Cazaespiritu:1290881433816137821>",
-    "FISURANTE": "<:Fisurante:1337862459008090112>",
-    "PRISMA": "<:Prisma:1367151400672559184>",
-    "PUAS": "<:Puas:1291468593506029638>",
-    "SANTI": "<:Santificador:1290858870260109384>",
-    "FORJACORTEZA": "<:Infortunio:1290858784528531537>",
-    "GOLEM": "<:Terrunico:1290880192092438540>",
-    "MARTILLO": "<:stoper:1290858463135662080>",
-    "1HARCANO": "<:Arcano:1297064938531196959>",
-    "LOCUS_OFENSIVO": "<:Locus:1291467422238249043>",
-    "CANCION": "<:Canciondedespertar:1291635941240213574>",
-    "CARAMBANOS": "<:caram:1384931326968463372>",
-    "DAMNATION": "<:Maldiciones:1337862954820829294>",
-    "PUTREFACTO": "<:Putrefacto:1370577320171016202>",
-    "WITCHWORD": "<:witchword:1392942341815533758>",
-    "TORRE_MOVIL": "<:MonturaMana:1337863658859925676>",
+# Combinación de roles y cupos de kiteo1 y kiteo2 de roaming.py
+# { "ROL": {"max_count": N, "emoji": "<:emoji_id:>"} }
+ALL_CTA_ROLES_CONFIG = {
+    "HOJ": {"max_count": 1, "emoji": "<:ManodeJusticia:1290858364129247242>"},
+    "PESADA": {"max_count": 1, "emoji": "<:stoper:1290858463135662080>"},
+    "LECHO PEEL": {"max_count": 1, "emoji": "<:stoper:1290858463135662080>"},
+    "LECHO SUP": {"max_count": 1, "emoji": "<:stoper:1290858463135662080>"},
+    "GA": {"max_count": 2, "emoji": "<:GranArcano:1337861969931407411>"},
+    "LOCUS": {"max_count": 2, "emoji": "<:Locus:1291467422238249043>"},
+    "JURADORES": {"max_count": 2, "emoji": "<:Maracas:1290858583965175828>"},
+    "ENRAIZADO": {"max_count": 1, "emoji": "<:Enraizado:1290879541073678397>"},
+    "LIFECURSED": {"max_count": 2, "emoji": "<:Maldi:1291467716229730415>"},
+    "OCULTO": {"max_count": 2, "emoji": "<:Oculto:1337862058779218026>"},
+    "ROMPERREINO": {"max_count": 1, "emoji": "<:RompeReino:1290881352182399017>"},
+    "CAZAESPÍRITUS": {"max_count": 1, "emoji": "<:Cazaespiritu:1290881433816137821>"},
+    "FISURANTE": {"max_count": 3, "emoji": "<:Fisurante:1337862459008090112>"},
+    "PRISMA": {"max_count": 2, "emoji": "<:Prisma:1367151400672559184>"},
+    "PUAS": {"max_count": 1, "emoji": "<:Puas:1291468593506029638>"},
+    "SANTI": {"max_count": 4, "emoji": "<:Santificador:1290858870260109384>"},
+    "FORJACORTEZA": {"max_count": 2, "emoji": "<:Infortunio:1290858784528531537>"},
+    "GOLEM": {"max_count": 1, "emoji": "<:Terrunico:1290880192092438540>"},
+    "MARTILLO": {"max_count": 1, "emoji": "<:stoper:1290858463135662080>"},
+    "1HARCANO": {"max_count": 1, "emoji": "<:Arcano:1297064938531196959>"},
+    "LOCUS_OFENSIVO": {"max_count": 1, "emoji": "<:Locus:1291467422238249043>"},
+    "CANCION": {"max_count": 1, "emoji": "<:Canciondedespertar:1291635941240213574>"},
+    "CARAMBANOS": {"max_count": 1, "emoji": "<:caram:1384931326968463372>"},
+    "DAMNATION": {"max_count": 1, "emoji": "<:Maldiciones:1337862954820829294>"},
+    "PUTREFACTO": {"max_count": 1, "emoji": "<:Putrefacto:1370577320171016202>"},
+    "WITCHWORD": {"max_count": 1, "emoji": "<:witchword:1392942341815533758>"},
+    "TORRE_MOVIL": {"max_count": 1, "emoji": "<:MonturaMana:1337863658859925676>"},
 }
-
 
 # ====================================================================
 # --- FUNCIONES HELPER DE CTA ---
 # ====================================================================
 
-def create_cta_embed(event_data, bot_instance):
+def create_cta_embed(event_data, bot_instance, event_id: str):
     """Genera el mensaje embed para el evento CTA (Pelea Obligatoria)."""
     embed = discord.Embed(
         title=f"🚨 ¡PELEA OBLIGATORIA! - Hora de Masseo: {event_data['mass_time']} UTC 🚨",
-        description="¡Prepárense para la acción! Anótate en el rol que te corresponda.",
+        description="¡Pérense para la acción! Anótate en el rol que te corresponda.",
         color=0xFF0000
     )
     embed.set_thumbnail(url="https://assets.albiononline.com/assets/images/icons/faction_standings_martlock.png")
 
-    # Campos para Roles y sus inscripciones
-    roles_str = []
+    roles_info = []
     total_inscritos = 0
+    total_cupos = 0
 
-    for rol, emoji in ALL_ALBION_ROLES.items():
-        inscritos = event_data["inscripciones"].get(rol, [])
-        waitlist_players = event_data["waitlist"].get(rol, [])
+    # Procesar roles inscritos
+    for role_name, config in event_data["role_config"].items():
+        emoji = config["emoji"]
+        max_count = config["max_count"]
+        inscritos = event_data["inscripciones"].get(role_name, [])
         total_inscritos += len(inscritos)
+        total_cupos += max_count
 
-        jugadores_insc = ' '.join(f'<@{uid}>' for uid in inscritos[:3]) # Mostrar solo 3 para no saturar
-        if len(inscritos) > 3:
-            jugadores_insc += f" (+{len(inscritos)-3} más)"
-
-        linea = f"{emoji} **{rol.ljust(20)}** → {jugadores_insc or '🚫'}"
-        if waitlist_players:
-            jugadores_wait = ' '.join(f'<@{uid}>' for uid in waitlist_players[:2]) # Mostrar 2 de lista de espera
-            if len(waitlist_players) > 2:
-                jugadores_wait += f" (+{len(waitlist_players)-2} más)"
-            linea += f" | ⏳ Espera: {jugadores_wait}"
-        roles_str.append(linea)
+        jugadores_insc = ' '.join(f'<@{uid}>' for uid in inscritos)
+        status = f"({len(inscritos)}/{max_count})"
+        roles_info.append(f"{emoji} **{role_name.ljust(20)}** {status} → {jugadores_insc or '🚫'}")
 
     # Dividir los roles en múltiples campos si hay muchos
-    for i in range(0, len(roles_str), 10): # Mostrar 10 roles por campo
+    for i in range(0, len(roles_info), 10): # Mostrar 10 roles por campo
         embed.add_field(
-            name=f"🎮 ROLES DISPONIBLES ({total_inscritos}/??)" if i == 0 else "↳ Continuación", # No hay max_players general aquí
-            value="\n".join(roles_str[i:i+10]),
+            name=f"🎮 ROLES DISPONIBLES ({total_inscritos}/{total_cupos})" if i == 0 else "↳ Continuación",
+            value="\n".join(roles_info[i:i+10]),
+            inline=False
+        )
+
+    # Añadir sección de lista de espera
+    waitlist_str = []
+    for role_name, config in event_data["role_config"].items():
+        emoji = config["emoji"]
+        waitlist_players = event_data["waitlist"].get(role_name, [])
+        if waitlist_players:
+            jugadores_wait = ' '.join(f'<@{uid}>' for uid in waitlist_players)
+            waitlist_str.append(f"{emoji} **{role_name} (Espera)** → {jugadores_wait}")
+    
+    if waitlist_str:
+        embed.add_field(
+            name="⏳ LISTA DE ESPERA POR ROL",
+            value="\n".join(waitlist_str),
             inline=False
         )
     
@@ -95,7 +106,7 @@ def create_cta_embed(event_data, bot_instance):
     
     caller_user = bot_instance.get_user(event_data['caller_id'])
     caller_display_name = caller_user.display_name if caller_user else 'Desconocido'
-    embed.set_footer(text=f"Evento creado por: {caller_display_name} | ID: {event_data['event_id']}")
+    embed.set_footer(text=f"Evento creado por: {caller_display_name} | ID: {event_id}")
     embed.timestamp = datetime.utcnow()
     return embed
 
@@ -103,13 +114,14 @@ async def update_cta_embed(event_id, bot_instance):
     if event_id not in cta_events:
         return
     event = cta_events[event_id]
-    message = event["message"]
+    message = event.get("message") # Usar .get para manejar caso donde el mensaje no se ha establecido aún
 
     if not message:
+        print(f"Mensaje no encontrado para el evento CTA {event_id}, no se puede actualizar el embed.")
         return
     try:
-        embed = create_cta_embed(event, bot_instance) # Pasa la instancia del bot
-        view = CTAEventView(event_id, event["caller_id"], bot_instance) # Pasa la instancia del bot
+        embed = create_cta_embed(event, bot_instance, event_id)
+        view = CTAEventView(event_id, event["caller_id"], bot_instance)
         await message.edit(embed=embed, view=view)
     except Exception as e:
         print(f"Error actualizando embed para el evento CTA {event_id}: {e}")
@@ -123,8 +135,9 @@ class CTARoleDropdown(discord.ui.Select):
     def __init__(self, event_id):
         self.event_id = event_id
         options = []
-        for role_name, emoji_str in ALL_ALBION_ROLES.items():
-            options.append(discord.SelectOption(label=role_name, value=role_name, emoji=emoji_str))
+        # Usar ALL_CTA_ROLES_CONFIG para las opciones del dropdown
+        for role_name, config in ALL_CTA_ROLES_CONFIG.items():
+            options.append(discord.SelectOption(label=role_name, value=role_name, emoji=config["emoji"]))
         
         super().__init__(
             placeholder="Elige tu rol...",
@@ -142,25 +155,50 @@ class CTARoleDropdown(discord.ui.Select):
         selected_role = self.values[0]
         user_id = interaction.user.id
         event_data = cta_events[self.event_id]
+        
+        # Obtener la configuración del rol seleccionado
+        role_config = event_data["role_config"].get(selected_role)
+        if not role_config:
+            await interaction.response.send_message("❌ Rol no válido.", ephemeral=True)
+            return
 
-        # Eliminar al usuario de todos los roles de este evento antes de añadirlo
-        for role_name in ALL_ALBION_ROLES.keys():
-            if user_id in event_data["inscripciones"].get(role_name, []):
-                event_data["inscripciones"][role_name].remove(user_id)
-            if user_id in event_data["waitlist"].get(role_name, []):
-                event_data["waitlist"][role_name].remove(user_id)
+        max_count = role_config["max_count"]
+
+        # Eliminar al usuario de todos los roles (inscripciones y lista de espera)
+        # antes de añadirlo al nuevo rol.
+        found_in_another_role = False
+        for role_name_iter in event_data["role_config"].keys():
+            if user_id in event_data["inscripciones"].get(role_name_iter, []):
+                event_data["inscripciones"][role_name_iter].remove(user_id)
+                found_in_another_role = True
+            if user_id in event_data["waitlist"].get(role_name_iter, []):
+                event_data["waitlist"][role_name_iter].remove(user_id)
+                found_in_another_role = True
 
         # Añadir al usuario al rol seleccionado
         inscripciones_rol = event_data["inscripciones"].setdefault(selected_role, [])
-        # En CTA no hay un límite fijo por rol en ALL_ALBION_ROLES, solo la presencia en el grupo
+        waitlist_rol = event_data["waitlist"].setdefault(selected_role, [])
+
+        if len(inscripciones_rol) < max_count:
+            if user_id not in inscripciones_rol: # Evitar duplicados
+                inscripciones_rol.append(user_id)
+                if found_in_another_role:
+                    await interaction.response.send_message(f"✅ Te has cambiado e inscrito como **{selected_role}**.", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"✅ Te has inscrito como **{selected_role}**.", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"ℹ️ Ya estás inscrito como **{selected_role}**.", ephemeral=True)
+        else: # El rol está lleno, añadir a la lista de espera
+            if user_id not in waitlist_rol: # Evitar duplicados
+                waitlist_rol.append(user_id)
+                if found_in_another_role:
+                    await interaction.response.send_message(f"✅ Te has cambiado y añadido a la **lista de espera** para **{selected_role}**.", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"✅ Te has añadido a la **lista de espera** para **{selected_role}**.", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"ℹ️ Ya estás en la lista de espera para **{selected_role}**.", ephemeral=True)
         
-        if user_id not in inscripciones_rol:
-            inscripciones_rol.append(user_id)
-            await interaction.response.send_message(f"✅ Te has inscrito como **{selected_role}**.", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"ℹ️ Ya estás inscrito como **{selected_role}**.", ephemeral=True)
-        
-        await update_cta_embed(self.event_id, self.view.bot_instance) # Pasa la instancia del bot desde la vista
+        await update_cta_embed(self.event_id, self.view.bot_instance)
 
 
 class CTALeaveButton(discord.ui.Button):
@@ -177,20 +215,18 @@ class CTALeaveButton(discord.ui.Button):
         event_data = cta_events[self.event_id]
         found = False
 
-        # Buscar y eliminar al usuario de inscripciones o lista de espera
-        for role_name in ALL_ALBION_ROLES.keys():
+        # Buscar y eliminar al usuario de inscripciones o lista de espera en cualquier rol
+        for role_name in event_data["role_config"].keys():
             if user_id in event_data["inscripciones"].get(role_name, []):
                 event_data["inscripciones"][role_name].remove(user_id)
                 found = True
-                break
             if user_id in event_data["waitlist"].get(role_name, []):
                 event_data["waitlist"][role_name].remove(user_id)
                 found = True
-                break
         
         if found:
             await interaction.response.send_message("✅ Te has salido del evento CTA.", ephemeral=True)
-            await update_cta_embed(self.event_id, self.view.bot_instance) # Pasa la instancia del bot
+            await update_cta_embed(self.event_id, self.view.bot_instance)
         else:
             await interaction.response.send_message("ℹ️ No estabas inscrito en este evento CTA.", ephemeral=True)
 
@@ -200,7 +236,7 @@ class CTAEventView(discord.ui.View):
         super().__init__(timeout=None)
         self.caller_id = caller_id
         self.event_id = event_id
-        self.bot_instance = bot_instance # Guardar la instancia del bot
+        self.bot_instance = bot_instance
         self.add_item(CTARoleDropdown(event_id))
         self.add_item(CTALeaveButton(event_id))
 
@@ -250,8 +286,9 @@ class CTAEventView(discord.ui.View):
             return
         
         event_data = cta_events[self.event_id]
-        event_data["inscripciones"] = {rol: [] for rol in ALL_ALBION_ROLES.keys()}
-        event_data["waitlist"] = {rol: [] for rol in ALL_ALBION_ROLES.keys()}
+        # Reiniciar inscripciones y listas de espera según la configuración de roles
+        event_data["inscripciones"] = {role: [] for role in event_data["role_config"].keys()}
+        event_data["waitlist"] = {role: [] for role in event_data["role_config"].keys()}
 
         await update_cta_embed(self.event_id, self.bot_instance)
         await interaction.response.send_message("✅ Se han reseteado todas las inscripciones y listas de espera del evento.", ephemeral=True)
@@ -275,20 +312,22 @@ class CTACog(commands.Cog):
         while event_id in cta_events:
             event_id = f"cta-{random.randint(1000, 9999)}"
 
+        # Usar la configuración de roles predefinida para este evento
         event_data = {
             "mass_time": mass_time,
             "caller_id": ctx.author.id,
             "channel_id": ctx.channel.id,
             "thread_id": None,
             "message_id": None,
-            "inscripciones": {rol: [] for rol in ALL_ALBION_ROLES.keys()},
-            "waitlist": {rol: [] for rol in ALL_ALBION_ROLES.keys()},
+            "role_config": ALL_CTA_ROLES_CONFIG, # Aquí se asigna la configuración de roles
+            "inscripciones": {role: [] for role in ALL_CTA_ROLES_CONFIG.keys()},
+            "waitlist": {role: [] for role in ALL_CTA_ROLES_CONFIG.keys()},
             "creation_time": datetime.utcnow()
         }
         cta_events[event_id] = event_data
 
-        embed = create_cta_embed(event_data, self.bot) # Pasa la instancia del bot
-        view = CTAEventView(event_id, ctx.author.id, self.bot) # Pasa la instancia del bot
+        embed = create_cta_embed(event_data, self.bot, event_id)
+        view = CTAEventView(event_id, ctx.author.id, self.bot)
         
         try:
             message = await ctx.send(embed=embed, view=view)
@@ -351,8 +390,9 @@ class CTACog(commands.Cog):
                     print(f"Fallo al eliminar el mensaje/hilo del evento CTA expirado {event_id}. Permisos faltantes.")
                 except Exception as e:
                     print(f"Error inesperado al eliminar el mensaje del evento CTA expirado {event_id}: {e}")
+                
+                events_to_remove.append(event_id)
             else:
-                # Si el evento no ha expirado, pero el mensaje/thread no existe (quizás borrado manualmente), también limpiarlo
                 try:
                     channel = self.bot.get_channel(channel_id)
                     if channel:
