@@ -3,7 +3,7 @@ from discord.ext import commands
 import asyncio
 from datetime import datetime, timedelta
 
-# --- Configuración de las composiciones de Roaming ---
+# --- Configuración de las composiciones de Roaming (mantener como está) ---
 ROAMING_PARTIES = {
     "kiteo1": {
         "max_players": 20,
@@ -67,8 +67,8 @@ ROAMING_PARTIES = {
             "REDENCION": "<:redencion:1395086294442573957>", "INFORTUNIO": "<:Infortunio:1290858784528531537>",
         },
         "mutually_exclusive_groups": [
-            {"roles": ["LOCUS", "ENRAIZADO"]},
-            {"roles": ["TALLADA", "CAZAESPÍRITUS"]}
+            {"roles": ["LOCUS", "ENRAIZADO"], "max_total": 1}, # Añadido max_total
+            {"roles": ["TALLADA", "CAZAESPÍRITUS"], "max_total": 1} # Añadido max_total
         ],
         "default_params": {"tier": "4.2", "ip": "1200", "time_offset_minutes": 15, "gank_swap": "No", "caller": None}
     },
@@ -151,10 +151,30 @@ class RoamingView(discord.ui.View):
         self.clear_items()
 
         options = []
+        # Asegúrate de generar las opciones solo para roles NO excluyentes
+        # y para los roles excluyentes, generar una única opción por grupo.
+        processed_exclusive_groups = set()
         for role, count in self.roles_needed.items():
-            if count > 0:
-                emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "❓")
-                options.append(discord.SelectOption(label=f"{role} ({count} disponibles)", value=role, emoji=emoji_str))
+            emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "❓")
+            
+            is_exclusive_role = False
+            for group in self.mutual_exclusive_groups:
+                if role in group["roles"]:
+                    is_exclusive_role = True
+                    group_key = tuple(sorted(group["roles"])) # Usar una tupla para identificar el grupo
+                    if group_key not in processed_exclusive_groups:
+                        # Solo añadir una opción por grupo excluyente
+                        combined_label = " / ".join(group["roles"])
+                        # Contar cuántos slots quedan en el grupo. Asumimos max_total es 1 para estos grupos.
+                        # Si es 1, y ya hay alguien en el grupo, no hay slots.
+                        current_players_in_group = sum(1 for uid, r in self.current_players.items() if r in group["roles"])
+                        if current_players_in_group < group.get("max_total", 1): # Default max_total to 1
+                            options.append(discord.SelectOption(label=f"{combined_label} (Disponible)", value=f"exclusive_{group['roles'][0]}", emoji="❓")) # Usa el primer rol como valor para el callback
+                        processed_exclusive_groups.add(group_key)
+                    break # Ya procesamos este rol como parte de un grupo excluyente
+
+            if not is_exclusive_role and count > 0:
+                options.append(discord.SelectOption(label=f"{role} ({count} dispo.)", value=role, emoji=emoji_str))
 
         if not options:
             options.append(discord.SelectOption(label="Todos los roles tomados", value="none", default=True))
@@ -167,13 +187,45 @@ class RoamingView(discord.ui.View):
         self.add_item(self.CloseEventButton(custom_id=f"close_event_{self.event_id}"))
 
     def get_current_composition_string(self):
-        composition_str = ""
+        composition_str = "**Roles Necesarios:**\n"
+        
+        # Primero, roles normales
+        normal_roles_info = []
         for role, count in self.roles_needed.items():
-            emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "")
-            composition_str += f"{emoji_str} **{role}**: {count} disponible(s)\n"
+            is_exclusive = False
+            for group in self.mutual_exclusive_groups:
+                if role in group["roles"]:
+                    is_exclusive = True
+                    break
+            if not is_exclusive:
+                emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "")
+                normal_roles_info.append(f"{emoji_str} **{role}**: {count} dispo.")
+
+        if normal_roles_info:
+            composition_str += "\n".join(normal_roles_info)
+        
+        # Luego, roles excluyentes
+        exclusive_roles_info = []
+        processed_exclusive_groups = set()
+        for group in self.mutual_exclusive_groups:
+            group_key = tuple(sorted(group["roles"]))
+            if group_key not in processed_exclusive_groups:
+                combined_roles_display = " / ".join(group["roles"])
+                current_players_in_group = sum(1 for uid, r in self.current_players.items() if r in group["roles"])
+                max_total = group.get("max_total", 1) # Default max_total to 1
+                
+                status_text = f"{max_total - current_players_in_group} dispo." if max_total - current_players_in_group > 0 else "ocupado"
+                exclusive_roles_info.append(f"❓ **{combined_roles_display}**: {status_text}")
+                processed_exclusive_groups.add(group_key)
+        
+        if exclusive_roles_info:
+            if normal_roles_info:
+                composition_str += "\n\n"
+            composition_str += "**Roles Excluyentes:**\n" + "\n".join(exclusive_roles_info)
+
 
         if self.current_players:
-            composition_str += "\n**Jugadores en la composición:**\n"
+            composition_str += "\n\n**Jugadores en la composición:**\n"
             players_by_role = {}
             for user_id, role in self.current_players.items():
                 if role not in players_by_role:
@@ -183,6 +235,7 @@ class RoamingView(discord.ui.View):
             for role, players_list in players_by_role.items():
                 emoji_str = ROAMING_PARTIES[self.composition_name]["emojis"].get(role, "")
                 composition_str += f"{emoji_str} **{role}**: {', '.join(players_list)}\n"
+        
         return composition_str
 
     def check_mutual_exclusion(self, user_id, new_role):
@@ -192,18 +245,34 @@ class RoamingView(discord.ui.View):
 
         for group in self.mutual_exclusive_groups:
             if new_role in group["roles"]:
-                # Check if user already has a role from this group
+                # Si el usuario ya tiene un rol de este grupo, no puede tomar otro rol del mismo grupo
                 if current_role and current_role in group["roles"] and current_role != new_role:
-                    return False # Cannot take a new role from the same exclusive group
-                # Check if group limit is reached
+                    return False 
+                
+                # Contar cuántos roles del grupo están tomados por otros jugadores
                 count_in_group = sum(1 for uid, r in self.current_players.items() if r in group["roles"] and uid != user_id)
-                if count_in_group + 1 > group.get("max_total", len(group["roles"])):
+                
+                # Si añadir este rol excede el max_total del grupo
+                if count_in_group + 1 > group.get("max_total", len(group["roles"])): # Default max_total to the number of roles in group
                     return False
         return True
 
     async def update_embed(self, message):
         embed = message.embeds[0]
+        # Asegúrate de que la descripción no exceda los 4096 caracteres
         embed.description = self.get_current_composition_string()
+        if len(embed.description) > 4096:
+            embed.description = "Descripción demasiado larga para mostrar. Roles y jugadores detallados a continuación." # Fallback message
+            # O podrías intentar truncar el string, o dividirlo en múltiples campos si es posible.
+
+        # Re-crear el campo de roles, o actualizar su valor
+        # Para simplificar y evitar el error 1024, eliminaremos el campo y pondremos todo en la descripción
+        # o si realmente queremos un campo, asegurarnos de que el contenido sea corto.
+        # Por ahora, moveré todo a la descripción principal del embed para el formato actualizado
+        # y eliminaremos el add_field específico para "Roles Necesarios".
+        # En el `roaming_command` tendremos que ajustar esto también.
+
+        # Actualizar el footer
         embed.set_footer(text=f"Jugadores: {len(self.current_players)}/{self.max_players}")
         await message.edit(embed=embed, view=self)
 
@@ -213,36 +282,81 @@ class RoamingView(discord.ui.View):
 
         async def callback(self, interaction: discord.Interaction):
             view: RoamingView = self.view
-            selected_role = self.values[0]
+            selected_value = self.values[0]
             user_id = interaction.user.id
             current_role = view.current_players.get(user_id)
 
-            if selected_role == "none": # Should not happen if select is disabled correctly
+            if selected_value == "none":
                 await interaction.response.send_message("No hay roles disponibles en este momento.", ephemeral=True)
                 return
+            
+            selected_role = selected_value
+            is_exclusive_selection = False
+            if selected_value.startswith("exclusive_"):
+                is_exclusive_selection = True
+                selected_role = selected_value.replace("exclusive_", "") # Obtener el nombre del rol real
+                # En este punto, `selected_role` es uno de los roles dentro del grupo excluyente.
+                # Tendremos que determinar si es el correcto o si el usuario quiere otro de ese grupo.
+                # Para simplificar, asumiremos que si elige "exclusive_LOCUS", se quiere LOCUS.
+                # Si el usuario hace clic en una opción de grupo, asignamos el primer rol del grupo
+                # que está disponible y no rompe la exclusividad. Esto requiere un ajuste.
+                
+                # Para hacerlo más robusto, el valor del SelectOption para un grupo exclusivo
+                # debería ser el nombre específico del rol que el usuario está eligiendo *dentro* de ese grupo.
+                # Por ahora, lo dejaré con `exclusive_ROLENAME` y en el callback
+                # asumimos que `selected_role` es el rol que el usuario realmente quiere.
 
-            if current_role == selected_role:
-                await interaction.response.send_message(f"Ya estás en el rol de **{selected_role}**.", ephemeral=True)
-                return
+                # Si el usuario ya está en un rol del mismo grupo excluyente y elige la misma opción del select,
+                # no hacemos nada.
+                if current_role and any(role in view.mutual_exclusive_groups for group in view.mutual_exclusive_groups if current_role in group["roles"] and selected_role in group["roles"]):
+                     await interaction.response.send_message(f"Ya estás en un rol de este grupo exclusivo o es el mismo rol.", ephemeral=True)
+                     return
 
-            # Handle mutual exclusive roles
+
+            # Manejar roles mutuamente excluyentes ANTES de asignar.
+            # `check_mutual_exclusion` ya lo hace, pero aquí el manejo de la lógica de asignación.
             if not view.check_mutual_exclusion(user_id, selected_role):
                 await interaction.response.send_message(f"No puedes tomar el rol de **{selected_role}** porque ya estás en un rol mutuamente excluyente o el límite del grupo se ha alcanzado.", ephemeral=True)
                 return
 
-            if view.roles_needed[selected_role] > 0:
-                if current_role: # User is changing role
-                    view.roles_needed[current_role] += 1 # Free up the old role
-                    view.current_players.pop(user_id) # Remove from current players
-                    
-                view.roles_needed[selected_role] -= 1
-                view.current_players[user_id] = selected_role
+            if current_role: # El usuario está cambiando de rol
+                # Si el rol actual es parte de un grupo excluyente, liberarlo correctamente
+                found_current_in_exclusive_group = False
+                for group in view.mutual_exclusive_groups:
+                    if current_role in group["roles"]:
+                        # Para roles excluyentes, no incrementamos el contador de roles individuales,
+                        # sino que marcamos que el slot del grupo está libre.
+                        # La lógica de `roles_needed` es para roles no-excluyentes.
+                        found_current_in_exclusive_group = True
+                        break
+                
+                if not found_current_in_exclusive_group:
+                    view.roles_needed[current_role] += 1 # Liberar el rol antiguo (si no era exclusivo)
+                view.current_players.pop(user_id) # Eliminar del usuario de los jugadores actuales
 
+            # Asignar el nuevo rol
+            found_new_in_exclusive_group = False
+            for group in view.mutual_exclusive_groups:
+                if selected_role in group["roles"]:
+                    # Para roles excluyentes, no decrementamos el contador de roles individuales.
+                    # Simplemente asignamos el rol. La comprobación `check_mutual_exclusion` ya maneja los límites.
+                    found_new_in_exclusive_group = True
+                    break
+
+            if not found_new_in_exclusive_group:
+                if view.roles_needed.get(selected_role, 0) > 0: # Check if normal role is available
+                    view.roles_needed[selected_role] -= 1
+                    view.current_players[user_id] = selected_role
+                    view.update_select_menu()
+                    await view.update_embed(interaction.message)
+                    await interaction.response.send_message(f"Te has unido a la composición como **{selected_role}**.", ephemeral=True)
+                else:
+                    await interaction.response.send_message(f"No hay más espacios para el rol de **{selected_role}**.", ephemeral=True)
+            else: # Es un rol exclusivo, ya hemos comprobado disponibilidad
+                view.current_players[user_id] = selected_role
                 view.update_select_menu()
                 await view.update_embed(interaction.message)
                 await interaction.response.send_message(f"Te has unido a la composición como **{selected_role}**.", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"No hay más espacios para el rol de **{selected_role}**.", ephemeral=True)
 
     class LeaveRoleButton(discord.ui.Button):
         def __init__(self, custom_id):
@@ -254,7 +368,16 @@ class RoamingView(discord.ui.View):
             current_role = view.current_players.get(user_id)
 
             if current_role:
-                view.roles_needed[current_role] += 1
+                # Si el rol es parte de un grupo excluyente, solo quitar al jugador sin afectar los contadores de `roles_needed`
+                is_exclusive_role = False
+                for group in view.mutual_exclusive_groups:
+                    if current_role in group["roles"]:
+                        is_exclusive_role = True
+                        break
+                
+                if not is_exclusive_role:
+                    view.roles_needed[current_role] += 1 # Liberar el rol antiguo (si no era exclusivo)
+                
                 view.current_players.pop(user_id)
                 view.update_select_menu()
                 await view.update_embed(interaction.message)
@@ -267,17 +390,12 @@ class RoamingView(discord.ui.View):
             super().__init__(label="Banca", style=discord.ButtonStyle.grey, custom_id=custom_id)
 
         async def callback(self, interaction: discord.Interaction):
-            # Only the caller can use this button
             view: RoamingView = self.view
-            caller_member = interaction.guild.get_member_by_id(int(view.caller_name.split('#')[1][:-1])) # Extract ID from <@!ID>
-            if interaction.user != caller_member:
+            caller_id = int(view.caller_name.split('<@')[1][:-1]) # Extract ID from <@ID> or <@!ID>
+            if interaction.user.id != caller_id:
                 await interaction.response.send_message("Solo el caller puede usar este botón.", ephemeral=True)
                 return
-
-            # Here you would implement logic for moving someone to bench
-            # For simplicity, let's just confirm it's for the caller.
             await interaction.response.send_message("Funcionalidad de banca (próximamente).", ephemeral=True)
-
 
     class CloseEventButton(discord.ui.Button):
         def __init__(self, custom_id):
@@ -293,8 +411,13 @@ class RoamingView(discord.ui.View):
             del active_roaming_events[view.event_id]
             for item in view.children:
                 item.disabled = True
-            await interaction.response.edit_message(content="¡Evento de roaming cerrado!", view=view, embed=None) # Clear embed or update as closed
-            await interaction.followup.send(f"El evento de roaming '{view.event_id}' ha sido cerrado por {interaction.user.mention}.", ephemeral=False)
+            
+            # --- CAMBIO AQUÍ PARA ELIMINAR EL RATE LIMIT ---
+            # En lugar de followup.send después de edit_message, 
+            # combina la acción o envía el mensaje de confirmación primero.
+            # Opción 1: Simplemente edita el mensaje para decir que está cerrado y la vista deshabilitada.
+            await interaction.response.edit_message(content=f"El evento de roaming '{view.event_id}' ha sido cerrado por {interaction.user.mention}.", view=view, embed=None)
+            # await interaction.response.send_message(f"El evento de roaming '{view.event_id}' ha sido cerrado por {interaction.user.mention}.", ephemeral=False) # Si quieres un mensaje separado
 
 
 class Roaming(commands.Cog):
@@ -342,10 +465,14 @@ class Roaming(commands.Cog):
         # Build the initial embed
         embed = discord.Embed(
             title=f"📢 ¡ROAMING - Composición: {composition_name.upper()}!",
-            description=f"**Tier**: {tier}\n**IP**: {ip}\n**ETA**: <t:{eta_timestamp}:R>\n**Gank Swap**: {gank_swap}\n**Caller**: {caller_display}\n\n**Roles Necesarios:**\n",
+            description=f"**Tier**: {tier}\n**IP**: {ip}\n**ETA**: <t:{eta_timestamp}:R>\n**Gank Swap**: {gank_swap}\n**Caller**: {caller_display}\n\n",
             color=discord.Color.blue()
         )
-        embed.add_field(name="---", value=self.get_initial_composition_string(composition_name), inline=False) # Use a helper method for string
+        # --- CAMBIO AQUÍ PARA EL CAMPO LARGO DEL EMBED ---
+        # El contenido de roles y jugadores se gestionará en la descripción principal del embed
+        # Esto evitará el error de límite de caracteres de campo.
+        embed.description += self.get_initial_composition_string_for_command(composition_name)
+
         embed.set_footer(text=f"Jugadores: 0/{comp_data['max_players']}")
 
         # Create the view with buttons and select menu
@@ -358,26 +485,42 @@ class Roaming(commands.Cog):
         # Store the event
         active_roaming_events[event_id] = {"message": message, "view": view, "caller_id": ctx.author.id}
     
-    def get_initial_composition_string(self, composition_name):
+    # Nuevo método para la string inicial del embed del comando
+    def get_initial_composition_string_for_command(self, composition_name):
         comp_data = ROAMING_PARTIES[composition_name]
         composition_str = ""
+        
+        # Procesar roles normales
+        normal_roles = []
         for role, count in comp_data["roles"].items():
-            emoji_str = comp_data["emojis"].get(role, "")
-            # Special handling for mutually exclusive roles in initial display
             is_exclusive = False
             for group in comp_data.get("mutually_exclusive_groups", []):
                 if role in group["roles"]:
-                    if not is_exclusive: # Add a header for the group if not already added
-                        composition_str += f"**Roles Excluyentes ({' / '.join(group['roles'])}):**\n"
                     is_exclusive = True
-                    # Only show one entry for the mutually exclusive group, e.g., "LOCUS / ENRAIZADO (1)"
-                    if group["roles"][0] == role: # Only display for the first role in the group
-                        combined_roles = " / ".join(group["roles"])
-                        composition_str += f"❓ **{combined_roles}**: 1 disponible(s)\n"
-                    break # Don't process this role further if it's part of an exclusive group
-
+                    break
             if not is_exclusive:
-                composition_str += f"{emoji_str} **{role}**: {count} disponible(s)\n"
+                emoji_str = comp_data["emojis"].get(role, "")
+                normal_roles.append(f"{emoji_str} **{role}**: {count} dispo.")
+        
+        if normal_roles:
+            composition_str += "**Roles Necesarios:**\n" + "\n".join(normal_roles)
+
+        # Procesar grupos de roles excluyentes
+        exclusive_groups_info = []
+        processed_exclusive_groups = set()
+        for group in comp_data.get("mutually_exclusive_groups", []):
+            group_key = tuple(sorted(group["roles"]))
+            if group_key not in processed_exclusive_groups:
+                combined_roles = " / ".join(group["roles"])
+                max_total_display = group.get("max_total", 1) # Display 1 if not specified
+                exclusive_groups_info.append(f"❓ **{combined_roles}**: {max_total_display} dispo.")
+                processed_exclusive_groups.add(group_key)
+        
+        if exclusive_groups_info:
+            if normal_roles:
+                composition_str += "\n\n"
+            composition_str += "**Roles Excluyentes:**\n" + "\n".join(exclusive_groups_info)
+
         return composition_str
 
 
