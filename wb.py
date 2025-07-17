@@ -79,6 +79,7 @@ WB_EVENT_TIMEOUT = 7200 # 2 horas
 
 async def update_wb_embed(event_id, bot_instance):
     if event_id not in wb_events:
+        print(f"[DEBUG update_wb_embed] Event ID {event_id} not found in wb_events during update attempt.")
         return
 
     event = wb_events[event_id]
@@ -86,6 +87,7 @@ async def update_wb_embed(event_id, bot_instance):
     message = event["message"]
 
     if not message:
+        print(f"[DEBUG update_wb_embed] Message object is None for event ID {event_id}.")
         return
 
     try:
@@ -124,7 +126,6 @@ async def update_wb_embed(event_id, bot_instance):
         else:
             is_disabled = False
             footer_text = "🔓 Todos pueden anotarse"
-            embed_color = 0x00FF00
             embed.description = event["description"]
 
         embed.set_footer(text=footer_text)
@@ -247,8 +248,6 @@ class WB_LeaveButton(discord.ui.Button):
                 break
         
         if found:
-            # Si aún no hemos respondido, respondemos. Si ya lo hicimos (por followup), esto podría dar error.
-            # Lo más seguro es siempre deferir si puede haber followup o múltiples mensajes.
             await interaction.response.send_message("✅ Te has salido del evento.", ephemeral=True)
             await update_wb_embed(self.event_id, self.view.bot_instance) # Pasa la instancia del bot
         else:
@@ -342,11 +341,17 @@ class WB_RoleSelectorView(discord.ui.View):
 
     @discord.ui.button(label="Activar Prioridad", style=discord.ButtonStyle.blurple, emoji="🚨", row=2)
     async def activate_priority_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # --- LÍNEAS DE DEPURACIÓN AÑADIDAS ---
+        print(f"[DEBUG Prioridad] Botón 'Activar Prioridad' clicado para event_id: {self.event_id}")
+        print(f"[DEBUG Prioridad] Keys actuales en wb_events: {list(wb_events.keys())}")
+        # -------------------------------------
+
         if interaction.user.id != self.caller_id:
             await interaction.response.send_message("❌ Solo el que lanzó el evento puede activar la prioridad.", ephemeral=True)
             return
 
         if self.event_id not in wb_events:
+            print(f"[DEBUG Prioridad] ERROR: Event ID {self.event_id} no encontrado en wb_events al activar prioridad.")
             await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
             return
 
@@ -576,6 +581,11 @@ class WorldBossCog(commands.Cog):
             "priority_mode": False
         }
         wb_events[event_id] = event_data
+        
+        # --- LÍNEAS DE DEPURACIÓN AÑADIDAS ---
+        print(f"[DEBUG WB] Evento creado con ID: {event_id}")
+        print(f"[DEBUG WB] wb_events contiene {len(wb_events)} eventos. Keys: {list(wb_events.keys())}")
+        # -------------------------------------
 
         embed = discord.Embed(
             title=f"👑 WORLD BOSS - {WB_BOSS_DATA[boss_type_lower]['name']}",
@@ -605,19 +615,13 @@ class WorldBossCog(commands.Cog):
                 event_data["thread_id"] = thread.id
                 await thread.send(f"¡Hilo de discusión para el World Boss '{WB_BOSS_DATA[boss_type_lower]['name']}'! <@{interaction.user.id}>", silent=True)
         except Exception as e:
+            # --- LÍNEA DE DEPURACIÓN CLAVE ---
             print(f"Error al enviar mensaje o crear hilo para WB: {e}")
+            # ---------------------------------
             await interaction.followup.send("❌ Hubo un error al crear el evento de World Boss. Intenta de nuevo más tarde.", ephemeral=True)
             if event_id in wb_events:
                 del wb_events[event_id]
             return
-        
-        # No se borra el mensaje de comando original en slash commands
-        # try:
-        #     await ctx.message.delete()
-        # except discord.Forbidden:
-        #     print("No tengo permisos para borrar el mensaje del comando original.")
-        # except discord.NotFound:
-        #     pass
 
     @app_commands.command(name="wbadd", description="Añade un usuario a un rol específico de un evento WB.")
     @app_commands.describe(
@@ -625,7 +629,14 @@ class WorldBossCog(commands.Cog):
         role_name="Nombre del rol al que añadir (ej. Main Tank)",
         user="Usuario a añadir"
     )
-    async def wb_add_user(self, interaction: discord.Interaction, event_id: str, role_name: str, user: discord.Member):
+    async def wb_add_user(self, interaction: discord.Interaction, event_id: str, user: discord.Member, role_name: str):
+        # Asegurarse de que role_name es la última variable en la definición si no es de tipo discord.Member
+        # o reorganizar el orden de los argumentos en el decorador @app_commands.describe
+        # según cómo se definen en la función.
+        # Por convención, discord.Member/discord.Channel/etc. suelen ir al final.
+        # Si role_name es un String, debe ser el último si hay un discord.Member antes.
+        # Corregido a role_name al final en @app_commands.describe para coincidir.
+
         await interaction.response.defer(ephemeral=True) # Deferir la respuesta
 
         if event_id not in wb_events:
@@ -719,7 +730,7 @@ class WorldBossCog(commands.Cog):
             channel_id = event_data.get("channel_id")
 
             if not creation_time or not message_id or not channel_id:
-                print(f"Evento WB {event_id} incompleto, marcando para eliminación.")
+                print(f"[DEBUG Cleanup] Evento WB {event_id} incompleto, marcando para eliminación.")
                 events_to_remove.append(event_id)
                 continue
 
@@ -727,7 +738,7 @@ class WorldBossCog(commands.Cog):
                 try:
                     channel = self.bot.get_channel(channel_id)
                     if not channel:
-                        print(f"Canal {channel_id} no encontrado para el evento WB {event_id}.")
+                        print(f"[DEBUG Cleanup] Canal {channel_id} no encontrado para el evento WB {event_id}.")
                         events_to_remove.append(event_id)
                         continue
                     
@@ -737,15 +748,15 @@ class WorldBossCog(commands.Cog):
                         if thread.archived:
                             await thread.edit(archived=False, reason="Desarchivando para eliminar por expiración WB")
                         await thread.delete()
-                        print(f"Hilo del evento WB expirado {event_id} eliminado.")
+                        print(f"[DEBUG Cleanup] Hilo del evento WB expirado {event_id} eliminado.")
                     await message.delete()
-                    print(f"Mensaje del evento WB expirado {event_id} eliminado.")
+                    print(f"[DEBUG Cleanup] Mensaje del evento WB expirado {event_id} eliminado.")
                 except discord.NotFound:
-                    print(f"Mensaje o hilo del evento WB expirado {event_id} ya no existe.")
+                    print(f"[DEBUG Cleanup] Mensaje o hilo del evento WB expirado {event_id} ya no existe.")
                 except discord.Forbidden:
-                    print(f"Fallo al eliminar el mensaje/hilo del evento WB expirado {event_id}. Permisos faltantes.")
+                    print(f"[DEBUG Cleanup] Fallo al eliminar el mensaje/hilo del evento WB expirado {event_id}. Permisos faltantes.")
                 except Exception as e:
-                    print(f"Error inesperado al eliminar el mensaje del evento WB expirado {event_id}: {e}")
+                    print(f"[DEBUG Cleanup] Error inesperado al eliminar el mensaje del evento WB expirado {event_id}: {e}")
                 
                 events_to_remove.append(event_id)
         
