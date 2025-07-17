@@ -9,7 +9,7 @@ import re
 import traceback
 
 # ====================================================================
-# --- DATOS Y VARIABLES GLOBALES DE WORLD BOSS ---
+# --- DATOS DE WORLD BOSS ---
 # ====================================================================
 
 WB_BOSS_DATA = {
@@ -22,12 +22,18 @@ WB_BOSS_DATA = {
             "Scout - Adelante": 1, "Scout - Atrás": 1, "Scout Patrol": 2,
         },
         "emojis": {
-            "Main Tank": "<:Incubo:1290858544488386633>", "Off Tank": "<:stoper:1290858463135662080>",
-            "Main Healer": "<:Santificador:1290858870260109384>", "Gran Arcano": "<:GranArcano:1337861969931407411>",
-            "Prisma": "<:Prisma:1367151400672559184>", "Invocador Oscuro (SC)": "<:InvocadorOscuro:1290880853353955338>",
-            "Flamígero": "<:BLAZING:1357789213558439956>", "Light Caller (LC)": "<:LIGHT_CALLER:1357788956137226361>",
-            "Montura Rinoceronte": "<:MonturaMana:1337863658859925676>", "Scout - Adelante": "<:Lecho:1337861780780875876>",
-            "Scout - Atrás": "<:Lecho:1337861780780875876>", "Scout Patrol": "<:Lecho:1337861780780875876>",
+            "Main Tank": "<:Incubo:1290858544488386633>", 
+            "Off Tank": "<:stoper:1290858463135662080>",
+            "Main Healer": "<:Santificador:1290858870260109384>", 
+            "Gran Arcano": "<:GranArcano:1337861969931407411>",
+            "Prisma": "<:Prisma:1367151400672559184>", 
+            "Invocador Oscuro (SC)": "<:InvocadorOscuro:1290880853353955338>",
+            "Flamígero": "<:BLAZING:1357789213558439956>", 
+            "Light Caller (LC)": "<:LIGHT_CALLER:1357788956137226361>",
+            "Montura Rinoceronte": "<:MonturaMana:1337863658859925676>", 
+            "Scout - Adelante": "<:Lecho:1337861780780875876>",
+            "Scout - Atrás": "<:Lecho:1337861780780875876>", 
+            "Scout Patrol": "<:Lecho:1337861780780875876>",
         },
         "default_description": (
             "**💀 Eldersleep — Zona Negra**\n"
@@ -50,12 +56,18 @@ WB_BOSS_DATA = {
             "Scout - Adelante": 1, "Scout - Atrás": 1, "Scout Patrol": 2,
         },
         "emojis": {
-            "Main Tank": "<:Incubo:1290858544488386633>", "Off Tank": "<:stoper:1290858463135662080>",
-            "Main Healer": "<:Santificador:1290858870260109384>", "Gran Arcano": "<:GranArcano:1337861969931407411>",
-            "Prisma": "<:Prisma:1367151400672559184>", "Invocador Oscuro (SC)": "<:InvocadorOscuro:1290880853353955338>",
-            "Flamígero": "<:BLAZING:1357789213558439956>", "Light Caller (LC)": "<:LIGHT_CALLER:1357788956137226361>",
-            "Montura Rinoceronte": "<:MonturaMana:1337863658859925676>", "Scout - Adelante": "<:Lecho:1337861780780875876>",
-            "Scout - Atrás": "<:Lecho:1337861780780875876>", "Scout Patrol": "<:Lecho:1337861780780875876>",
+            "Main Tank": "<:Incubo:1290858544488386633>", 
+            "Off Tank": "<:stoper:1290858463135662080>",
+            "Main Healer": "<:Santificador:1290858870260109384>", 
+            "Gran Arcano": "<:GranArcano:1337861969931407411>",
+            "Prisma": "<:Prisma:1367151400672559184>", 
+            "Invocador Oscuro (SC)": "<:InvocadorOscuro:1290880853353955338>",
+            "Flamígero": "<:BLAZING:1357789213558439956>", 
+            "Light Caller (LC)": "<:LIGHT_CALLER:1357788956137226361>",
+            "Montura Rinoceronte": "<:MonturaMana:1337863658859925676>", 
+            "Scout - Adelante": "<:Lecho:1337861780780875876>",
+            "Scout - Atrás": "<:Lecho:1337861780780875876>", 
+            "Scout Patrol": "<:Lecho:1337861780780875876>",
         },
         "default_description": (
             "**👁️ Eye of the Forest — Zona Negra**\n"
@@ -76,151 +88,180 @@ wb_priority_users = {}
 WB_EVENT_TIMEOUT = 7200  # 2 horas
 
 # ====================================================================
-# --- FUNCIONES HELPER ---
+# --- FUNCIONES AUXILIARES ---
 # ====================================================================
 
-async def log_error(error_message, interaction=None):
-    """Registra errores detallados con traceback"""
-    error_trace = traceback.format_exc()
-    full_error = f"ERROR: {error_message}\n{error_trace}"
-    print(full_error)
-    
-    if interaction:
-        try:
-            await interaction.followup.send(f"🔴 Error interno: {error_message}", ephemeral=True)
-        except:
-            pass
-
 async def update_wb_embed(event_id, bot_instance):
+    """Actualiza el embed del evento WB"""
+    if event_id not in wb_events:
+        return
+
+    event = wb_events[event_id]
+    message = event.get("message")
+    if not message:
+        return
+
     try:
-        if event_id not in wb_events:
-            return
-
-        event = wb_events[event_id]
-        message = event.get("message")
-        if not message:
-            return
-
-        embed = message.embeds[0].copy() if message.embeds else discord.Embed()
-        embed.clear_fields()
-
-        boss = event["boss"]
-        is_disabled = False
-        footer_text = ""
-        embed_color = 0x8B0000
-
-        # Manejo de modo prioridad
+        embed = discord.Embed(
+            title=f"👑 WORLD BOSS - {WB_BOSS_DATA[event['boss']]['name']}",
+            color=0x00FF00
+        )
+        
+        # Configurar descripción según modo prioridad
         if event.get("priority_mode", False):
             priority_data = wb_priority_users.get(event_id)
             if priority_data and time.time() < priority_data["expiry"]:
                 time_left = int(priority_data["expiry"] - time.time())
-                minutes_left = max(0, time_left // 60)
-                seconds_left = max(0, time_left % 60)
-
                 embed.description = (
                     f"{event['description']}\n\n"
-                    f"🎯 **Sistema de Prioridad Activo**\n"
-                    f"⏳ **Tiempo restante:** {minutes_left}m {seconds_left}s\n"
-                    f"👥 **Usuarios prioritarios:** {', '.join([f'<@{uid}>' for uid in priority_data['users']])}\n"
-                    f"📊 **Slots usados:** {len(priority_data['users'])}/{priority_data['slots']}"
+                    f"🎯 **Prioridad activa** ({time_left//60}m {time_left%60}s)\n"
+                    f"👥 {len(priority_data['users'])}/{priority_data['slots']} slots usados"
                 )
-                is_disabled = True
-                footer_text = "🔒 Solo usuarios prioritarios pueden anotarse"
-                embed_color = 0xFF4500
+                embed.color = 0xFFA500  # Naranja para prioridad
             else:
                 event["priority_mode"] = False
-                footer_text = "🔓 Todos pueden anotarse"
-                embed_color = 0x00FF00
                 embed.description = event["description"]
-                if event_id in wb_priority_users:
-                    del wb_priority_users[event_id]
         else:
-            footer_text = "🔓 Todos pueden anotarse"
-            embed_color = 0x00FF00
             embed.description = event["description"]
 
-        embed.set_footer(text=footer_text)
-        embed.color = embed_color
-
-        # Actualizar campos de roles
-        for role in WB_BOSS_DATA[boss]["roles"]:
-            players = ", ".join([f"<@{uid}>" for uid in event["inscriptions"][role]])
-            waitlist_players = ", ".join([f"<@{uid}>" for uid in event["waitlist"][role]])
-
-            role_status = ""
+        # Añadir campos de roles
+        for role, limit in WB_BOSS_DATA[event['boss']]["roles"].items():
+            players = event["inscriptions"].get(role, [])
+            waitlist = event["waitlist"].get(role, [])
+            
+            value = "🚫 Vacío"
             if players:
-                role_status += f"👥 {players}"
-            if waitlist_players:
-                role_status += f"\n⏳ Espera: {waitlist_players}"
-
-            if not role_status:
-                role_status = "🚫 Vacío"
+                value = "👥 " + ", ".join([f"<@{p}>" for p in players])
+            if waitlist:
+                value += "\n⏳ " + ", ".join([f"<@{w}>" for w in waitlist])
 
             embed.add_field(
-                name=f"{WB_BOSS_DATA[boss]['emojis'].get(role)} {role} ({len(event['inscriptions'][role])}/{WB_BOSS_DATA[boss]['roles'][role]} +{len(event['waitlist'][role])} en espera)",
-                value=role_status,
+                name=f"{WB_BOSS_DATA[event['boss']]['emojis'].get(role)} {role} ({len(players)}/{limit})",
+                value=value,
                 inline=False
             )
 
-        view = WB_RoleSelectorView(boss, event_id, event["caller_id"], bot_instance, disabled=is_disabled)
+        # Crear vista actualizada
+        view = WB_RoleSelectorView(
+            event['boss'], 
+            event_id, 
+            event['caller_id'], 
+            bot_instance,
+            disabled=event.get("priority_mode", False)
+        )
+
         await message.edit(embed=embed, view=view)
 
     except Exception as e:
-        await log_error(f"Error al actualizar embed para evento {event_id}", None)
+        print(f"Error actualizando embed WB: {e}")
+        traceback.print_exc()
 
 # ====================================================================
-# --- VISTAS Y COMPONENTES DE UI ---
+# --- VISTAS Y COMPONENTES UI ---
 # ====================================================================
 
 class WB_RoleDropdown(discord.ui.Select):
-    def __init__(self, boss, event_id, disabled):
-        options = []
-        for role_name in WB_BOSS_DATA[boss]["roles"].keys():
-            emoji_str = WB_BOSS_DATA[boss]["emojis"].get(role_name)
-            options.append(discord.SelectOption(label=role_name, value=role_name, emoji=emoji_str))
-        
+    def __init__(self, boss, event_id, disabled=False):
+        options = [
+            discord.SelectOption(
+                label=role,
+                emoji=WB_BOSS_DATA[boss]["emojis"].get(role),
+                description=f"{WB_BOSS_DATA[boss]['roles'][role]} slots"
+            ) for role in WB_BOSS_DATA[boss]["roles"]
+        ]
         super().__init__(
-            placeholder="Elige tu rol...",
-            min_values=1,
-            max_values=1,
+            placeholder="Selecciona tu rol",
             options=options,
-            disabled=disabled,
-            row=0
+            disabled=disabled
         )
+        self.boss = boss
+        self.event_id = event_id
 
     async def callback(self, interaction: discord.Interaction):
-        try:
-            if self.view.event_id not in wb_events:
-                await interaction.response.send_message("❌ Este evento WB ya no está activo.", ephemeral=True)
-                return
+        await interaction.response.defer(ephemeral=True)
+        
+        if self.event_id not in wb_events:
+            return await interaction.followup.send("❌ Evento no encontrado", ephemeral=True)
 
-            selected_role = self.values[0]
-            user_id = interaction.user.id
-            event_data = wb_events[self.view.event_id]
-            
-            # Remover al usuario de otros roles
-            for role_name in WB_BOSS_DATA[self.view.boss]["roles"].keys():
-                if user_id in event_data["inscriptions"].get(role_name, []):
-                    event_data["inscriptions"][role_name].remove(user_id)
-                if user_id in event_data["waitlist"].get(role_name, []):
-                    event_data["waitlist"][role_name].remove(user_id)
+        event = wb_events[self.event_id]
+        selected_role = self.values[0]
+        user_id = interaction.user.id
 
-            # Añadir al rol seleccionado
-            role_limit = WB_BOSS_DATA[self.view.boss]["roles"][selected_role]
-            inscriptions = event_data["inscriptions"].setdefault(selected_role, [])
-            waitlist = event_data["waitlist"].setdefault(selected_role, [])
+        # Verificar prioridad si está activa
+        if event.get("priority_mode", False):
+            priority_data = wb_priority_users.get(self.event_id)
+            if priority_data and time.time() < priority_data["expiry"]:
+                if user_id not in priority_data["users"] and user_id != event["caller_id"]:
+                    return await interaction.followup.send(
+                        "❌ Solo usuarios prioritarios pueden unirse ahora",
+                        ephemeral=True
+                    )
 
-            if len(inscriptions) < role_limit:
-                inscriptions.append(user_id)
-                await interaction.response.send_message(f"✅ Te has inscrito como **{selected_role}**.", ephemeral=True)
-            else:
-                waitlist.append(user_id)
-                await interaction.response.send_message(f"⚠️ Rol lleno. Lista de espera para **{selected_role}**.", ephemeral=True)
-            
-            await update_wb_embed(self.view.event_id, self.view.bot_instance)
+        # Remover de otros roles
+        for role in event["inscriptions"]:
+            if user_id in event["inscriptions"][role]:
+                event["inscriptions"][role].remove(user_id)
+        for role in event["waitlist"]:
+            if user_id in event["waitlist"][role]:
+                event["waitlist"][role].remove(user_id)
 
-        except Exception as e:
-            await log_error("Error en RoleDropdown callback", interaction)
+        # Añadir al rol seleccionado
+        role_limit = WB_BOSS_DATA[self.boss]["roles"][selected_role]
+        if len(event["inscriptions"][selected_role]) < role_limit:
+            event["inscriptions"][selected_role].append(user_id)
+            await interaction.followup.send(f"✅ Unido como {selected_role}", ephemeral=True)
+        else:
+            event["waitlist"][selected_role].append(user_id)
+            await interaction.followup.send(f"⏳ En espera para {selected_role}", ephemeral=True)
+
+        await update_wb_embed(self.event_id, self.view.bot_instance)
+
+class WB_LeaveButton(discord.ui.Button):
+    def __init__(self, event_id):
+        super().__init__(
+            label="Salir", 
+            style=discord.ButtonStyle.red,
+            emoji="🚪"
+        )
+        self.event_id = event_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        if self.event_id not in wb_events:
+            return await interaction.followup.send("❌ Evento no encontrado", ephemeral=True)
+
+        event = wb_events[self.event_id]
+        user_id = interaction.user.id
+        removed = False
+
+        # Buscar y remover al usuario
+        for role in event["inscriptions"]:
+            if user_id in event["inscriptions"][role]:
+                event["inscriptions"][role].remove(user_id)
+                removed = True
+                
+                # Mover siguiente de la lista de espera
+                if event["waitlist"][role]:
+                    next_user = event["waitlist"][role].pop(0)
+                    event["inscriptions"][role].append(next_user)
+                    try:
+                        user = await interaction.guild.fetch_member(next_user)
+                        await user.send(f"🎉 Has sido movido al rol {role} en WB!")
+                    except:
+                        pass
+
+        if not removed:
+            for role in event["waitlist"]:
+                if user_id in event["waitlist"][role]:
+                    event["waitlist"][role].remove(user_id)
+                    removed = True
+
+        if removed:
+            await interaction.followup.send("✅ Has salido del evento", ephemeral=True)
+            await update_wb_embed(self.event_id, self.view.bot_instance)
+        else:
+            await interaction.followup.send("❌ No estabas inscrito", ephemeral=True)
 
 class WB_RoleSelectorView(discord.ui.View):
     def __init__(self, boss, event_id, caller_id, bot_instance, disabled=False):
@@ -231,23 +272,7 @@ class WB_RoleSelectorView(discord.ui.View):
         self.bot_instance = bot_instance
         
         self.add_item(WB_RoleDropdown(boss, event_id, disabled))
-        self.add_item(discord.ui.Button(label="Salirme", style=discord.ButtonStyle.red, emoji="👋", row=1, custom_id=f"leave_{event_id}"))
-        self.add_item(discord.ui.Button(label="Lista Espera", style=discord.ButtonStyle.grey, emoji="⏳", row=1, custom_id=f"waitlist_{event_id}"))
-        
-        # Botones de administración
-        self.add_item(discord.ui.Button(label="Cerrar Evento", style=discord.ButtonStyle.danger, emoji="🚫", row=2, custom_id=f"close_{event_id}"))
-        self.add_item(discord.ui.Button(label="Activar Prioridad", style=discord.ButtonStyle.blurple, emoji="🚨", row=2, custom_id=f"priority_{event_id}"))
-        self.add_item(discord.ui.Button(label="Resetear", style=discord.ButtonStyle.secondary, emoji="♻️", row=2, custom_id=f"reset_{event_id}"))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        try:
-            if interaction.data.get("custom_id", "").startswith("close_") and interaction.user.id != self.caller_id:
-                await interaction.response.send_message("❌ Solo el organizador puede cerrar el evento.", ephemeral=True)
-                return False
-            return True
-        except Exception as e:
-            await log_error("Error en interaction_check", interaction)
-            return False
+        self.add_item(WB_LeaveButton(event_id))
 
 # ====================================================================
 # --- COG PRINCIPAL ---
@@ -261,34 +286,34 @@ class WorldBossCog(commands.Cog):
     def cog_unload(self):
         self.cleanup_task.cancel()
 
-    @app_commands.command(name="wb", description="Inicia un evento de World Boss")
+    @app_commands.command(name="wb", description="Crea un evento de World Boss")
     @app_commands.describe(
         boss_type="Tipo de World Boss (elder o eye)",
         duration="Duración mínima en minutos (default: 60)"
     )
+    @app_commands.guild_only()
     async def wb_command(self, interaction: discord.Interaction, boss_type: str, duration: int = 60):
-        """Manejador principal del comando /wb"""
-        await interaction.response.defer()
-        
+        """Manejador del comando /wb"""
         try:
+            await interaction.response.defer()
+            
             boss_type = boss_type.lower()
             if boss_type not in WB_BOSS_DATA:
-                await interaction.followup.send(
-                    f"❌ Boss '{boss_type}' no válido. Opciones: elder, eye",
+                return await interaction.followup.send(
+                    f"❌ Boss inválido. Opciones: elder, eye",
                     ephemeral=True
                 )
-                return
 
-            # Crear ID único para el evento
+            # Crear ID único
             event_id = f"wb-{random.randint(1000, 9999)}"
             while event_id in wb_events:
                 event_id = f"wb-{random.randint(1000, 9999)}"
 
-            # Configurar datos del evento
+            # Configurar evento
             event_data = {
                 "boss": boss_type,
                 "caller_id": interaction.user.id,
-                "channel_id": interaction.channel_id,
+                "channel_id": interaction.channel.id,
                 "message": None,
                 "inscriptions": {role: [] for role in WB_BOSS_DATA[boss_type]["roles"]},
                 "waitlist": {role: [] for role in WB_BOSS_DATA[boss_type]["roles"]},
@@ -304,7 +329,7 @@ class WorldBossCog(commands.Cog):
                 description=event_data["description"],
                 color=0x00FF00
             )
-            embed.set_footer(text="🔓 Todos pueden anotarse")
+            embed.set_footer(text="🔓 Todos pueden unirse")
             
             for role in WB_BOSS_DATA[boss_type]["roles"]:
                 embed.add_field(
@@ -313,12 +338,19 @@ class WorldBossCog(commands.Cog):
                     inline=False
                 )
 
-            # Crear y enviar vista
-            view = WB_RoleSelectorView(boss_type, event_id, interaction.user.id, self.bot)
+            # Crear vista
+            view = WB_RoleSelectorView(
+                boss_type, 
+                event_id, 
+                interaction.user.id, 
+                self.bot
+            )
+
+            # Enviar mensaje
             message = await interaction.followup.send(embed=embed, view=view)
             event_data["message"] = message
 
-            # Crear hilo de discusión
+            # Crear hilo
             if isinstance(interaction.channel, discord.TextChannel):
                 try:
                     thread = await message.create_thread(
@@ -326,47 +358,49 @@ class WorldBossCog(commands.Cog):
                         auto_archive_duration=60
                     )
                     event_data["thread_id"] = thread.id
-                    await thread.send(f"💬 Hilo de discusión para {interaction.user.mention}", silent=True)
+                    await thread.send(
+                        f"💬 Hilo creado por {interaction.user.mention}",
+                        silent=True
+                    )
                 except discord.Forbidden:
                     await interaction.followup.send(
-                        "⚠️ Evento creado pero no pude crear el hilo (falta permiso)",
+                        "⚠️ No pude crear el hilo (falta permiso)",
                         ephemeral=True
                     )
 
         except Exception as e:
-            await log_error(f"Error en comando /wb: {str(e)}", interaction)
+            print(f"Error en /wb: {e}")
+            traceback.print_exc()
+            
             if event_id in wb_events:
                 del wb_events[event_id]
+                
             await interaction.followup.send(
-                "❌ Error crítico al crear el evento. Contacta al administrador.",
+                "❌ Error al crear el evento",
                 ephemeral=True
             )
 
     @tasks.loop(minutes=5)
     async def cleanup_wb_events(self):
-        """Limpia eventos antiguos automáticamente"""
-        try:
-            current_time = datetime.utcnow()
-            to_remove = []
+        """Limpia eventos WB antiguos"""
+        current_time = datetime.utcnow()
+        to_remove = []
 
-            for event_id, event in wb_events.items():
-                if (current_time - event["creation_time"]).total_seconds() > WB_EVENT_TIMEOUT:
-                    try:
-                        if event.get("message"):
-                            await event["message"].delete()
-                        if event.get("thread_id"):
-                            thread = self.bot.get_channel(event["thread_id"])
-                            if thread:
-                                await thread.delete()
-                    except:
-                        pass
-                    to_remove.append(event_id)
+        for event_id, event in wb_events.items():
+            if (current_time - event["creation_time"]).total_seconds() > WB_EVENT_TIMEOUT:
+                try:
+                    if event.get("message"):
+                        await event["message"].delete()
+                    if event.get("thread_id"):
+                        thread = self.bot.get_channel(event["thread_id"])
+                        if thread:
+                            await thread.delete()
+                except:
+                    pass
+                to_remove.append(event_id)
 
-            for event_id in to_remove:
-                wb_events.pop(event_id, None)
-
-        except Exception as e:
-            print(f"Error en cleanup_wb_events: {str(e)}")
+        for event_id in to_remove:
+            wb_events.pop(event_id, None)
 
     @cleanup_wb_events.before_loop
     async def before_cleanup(self):
