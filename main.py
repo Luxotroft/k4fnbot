@@ -47,6 +47,14 @@ async def on_ready():
             print(f"Error: Extensión {extension} no encontrada. Asegúrate de que el archivo exista.")
         except Exception as e:
             print(f"Error al cargar la extensión {extension}: {e}")
+    
+    # --- ¡IMPORTANTE! Sincronizar comandos de barra ---
+    try:
+        synced = await bot.tree.sync()
+        print(f"Sincronizados {len(synced)} comando(s) de barra.")
+    except Exception as e:
+        print(f"Error al sincronizar comandos de barra: {e}")
+
 
 # ====================================================================
 # --- 3. EJECUCIÓN DEL BOT ---
