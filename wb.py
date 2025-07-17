@@ -1,9 +1,11 @@
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands # Importar app_commands para comandos de barra
 from datetime import datetime, timedelta
 import asyncio
 import time
 import random
+import re # ¡IMPORTANTE! Necesario para re.search
 
 # ====================================================================
 # --- DATOS Y VARIABLES GLOBALES DE WORLD BOSS ---
@@ -236,6 +238,7 @@ class WB_LeaveButton(discord.ui.Button):
                 if event_data["waitlist"].get(role_name):
                     next_player_id = event_data["waitlist"][role_name].pop(0)
                     event_data["inscriptions"][role_name].append(next_player_id)
+                    # Usar followup.send después de la respuesta inicial (ephemeral)
                     await interaction.followup.send(f"<@{next_player_id}>, ¡has sido movido de la lista de espera al rol de **{role_name}**!", ephemeral=False)
                 break
             if user_id in event_data["waitlist"].get(role_name, []):
@@ -244,6 +247,8 @@ class WB_LeaveButton(discord.ui.Button):
                 break
         
         if found:
+            # Si aún no hemos respondido, respondemos. Si ya lo hicimos (por followup), esto podría dar error.
+            # Lo más seguro es siempre deferir si puede haber followup o múltiples mensajes.
             await interaction.response.send_message("✅ Te has salido del evento.", ephemeral=True)
             await update_wb_embed(self.event_id, self.view.bot_instance) # Pasa la instancia del bot
         else:
@@ -305,6 +310,8 @@ class WB_RoleSelectorView(discord.ui.View):
             await interaction.response.send_message("❌ Este evento ya no está activo.", ephemeral=True)
             return
 
+        await interaction.response.defer(ephemeral=True) # Defer para evitar timeout si el hilo tarda en borrar
+
         thread = interaction.message.thread
         if thread:
             try:
@@ -324,11 +331,14 @@ class WB_RoleSelectorView(discord.ui.View):
         try:
             await interaction.message.delete()
             del wb_events[self.event_id]
-            await interaction.response.send_message("✅ Evento WB cerrado y mensaje eliminado.", ephemeral=True)
+            await interaction.followup.send("✅ Evento WB cerrado y mensaje eliminado.", ephemeral=True)
         except discord.NotFound:
             print(f"Mensaje del evento WB {self.event_id} ya eliminado.")
+            await interaction.followup.send("✅ Evento WB cerrado (el mensaje ya había sido eliminado).", ephemeral=True)
         except Exception as e:
             print(f"Error al eliminar el mensaje del evento WB {self.event_id}: {e}")
+            await interaction.followup.send(f"❌ Hubo un error al eliminar el mensaje del evento: {e}", ephemeral=True)
+
 
     @discord.ui.button(label="Activar Prioridad", style=discord.ButtonStyle.blurple, emoji="🚨", row=2)
     async def activate_priority_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -351,6 +361,11 @@ class WB_RoleSelectorView(discord.ui.View):
             slots_input = discord.ui.TextInput(label="Número de slots de prioridad", placeholder="Ej: 5", required=True)
             duration_input = discord.ui.TextInput(label="Duración de la prioridad (minutos)", placeholder="Ej: 15", required=True)
 
+            # Referencia a la vista para acceder a event_id y bot_instance
+            def __init__(self, parent_view):
+                super().__init__()
+                self.parent_view = parent_view
+
             async def on_submit(self, modal_interaction: discord.Interaction):
                 try:
                     slots = int(self.slots_input.value)
@@ -359,21 +374,20 @@ class WB_RoleSelectorView(discord.ui.View):
                         await modal_interaction.response.send_message("❌ Los valores de slots y duración deben ser mayores a 0.", ephemeral=True)
                         return
 
-                    wb_priority_users[self.view.event_id] = {
+                    wb_priority_users[self.parent_view.event_id] = { # Usar parent_view
                         "users": [],
                         "expiry": time.time() + (duration_minutes * 60),
                         "slots": slots
                     }
                     event_data["priority_mode"] = True
-                    await update_wb_embed(self.view.event_id, self.view.bot_instance)
+                    await update_wb_embed(self.parent_view.event_id, self.parent_view.bot_instance) # Usar parent_view
                     await modal_interaction.response.send_message(f"✅ Modo prioridad activado para {slots} slots durante {duration_minutes} minutos.", ephemeral=True)
 
                 except ValueError:
                     await modal_interaction.response.send_message("❌ Por favor, introduce números válidos para slots y duración.", ephemeral=True)
 
         # Crear una instancia del modal y mostrarla
-        modal = PriorityConfigModal(title="Configurar Prioridad")
-        modal.view = self # Importante para pasar la vista al modal y acceder a event_id
+        modal = PriorityConfigModal(self) # Pasa la vista actual al modal
         await interaction.response.send_modal(modal)
 
 
@@ -418,6 +432,10 @@ class WB_RoleSelectorView(discord.ui.View):
         class AddPriorityUserModal(discord.ui.Modal, title="Agregar Usuario Prioritario"):
             user_input = discord.ui.TextInput(label="Menciona al usuario", placeholder="Ej: @Usuario#1234", required=True)
 
+            def __init__(self, parent_view):
+                super().__init__()
+                self.parent_view = parent_view # Guardar referencia a la vista
+
             async def on_submit(self, modal_interaction: discord.Interaction):
                 try:
                     user_mention = self.user_input.value.strip()
@@ -438,14 +456,13 @@ class WB_RoleSelectorView(discord.ui.View):
                         return
                     
                     priority_data["users"].append(user_id)
-                    await update_wb_embed(self.view.event_id, self.view.bot_instance)
+                    await update_wb_embed(self.parent_view.event_id, self.parent_view.bot_instance) # Usar parent_view
                     await modal_interaction.response.send_message(f"✅ <@{user_id}> ha sido añadido a la lista de prioritarios.", ephemeral=True)
 
                 except Exception as e:
                     await modal_interaction.response.send_message(f"❌ Error al agregar usuario: {e}", ephemeral=True)
 
-        modal = AddPriorityUserModal(title="Agregar Usuario Prioritario")
-        modal.view = self
+        modal = AddPriorityUserModal(self) # Pasa la vista actual al modal
         await interaction.response.send_modal(modal)
 
 
@@ -467,6 +484,10 @@ class WB_RoleSelectorView(discord.ui.View):
         class RemovePriorityUserModal(discord.ui.Modal, title="Remover Usuario Prioritario"):
             user_input = discord.ui.TextInput(label="Menciona al usuario", placeholder="Ej: @Usuario#1234", required=True)
 
+            def __init__(self, parent_view):
+                super().__init__()
+                self.parent_view = parent_view # Guardar referencia a la vista
+
             async def on_submit(self, modal_interaction: discord.Interaction):
                 try:
                     user_mention = self.user_input.value.strip()
@@ -483,14 +504,13 @@ class WB_RoleSelectorView(discord.ui.View):
                         return
                     
                     priority_data["users"].remove(user_id)
-                    await update_wb_embed(self.view.event_id, self.view.bot_instance)
+                    await update_wb_embed(self.parent_view.event_id, self.parent_view.bot_instance) # Usar parent_view
                     await modal_interaction.response.send_message(f"✅ <@{user_id}> ha sido removido de la lista de prioritarios.", ephemeral=True)
 
                 except Exception as e:
                     await modal_interaction.response.send_message(f"❌ Error al remover usuario: {e}", ephemeral=True)
 
-        modal = RemovePriorityUserModal(title="Remover Usuario Prioritario")
-        modal.view = self
+        modal = RemovePriorityUserModal(self) # Pasa la vista actual al modal
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Resetear Inscripciones", style=discord.ButtonStyle.secondary, emoji="♻️", row=3)
@@ -523,11 +543,18 @@ class WorldBossCog(commands.Cog):
     def cog_unload(self):
         self.cleanup_wb_events.cancel()
 
-    @commands.command(name="wb", aliases=["worldboss", "boss"])
-    async def wb(self, ctx, boss_type: str, duration: int = 60, *args):
+    @app_commands.command(name="wb", description="Inicia un evento de World Boss.")
+    @app_commands.describe(
+        boss_type="Tipo de World Boss (elder o eye)",
+        duration="Tiempo mínimo de duración en minutos (default: 60)"
+    )
+    async def wb(self, interaction: discord.Interaction, boss_type: str, duration: app_commands.Range[int, 1, None] = 60):
+        # Es crucial deferir la respuesta para que Discord no dé timeout
+        await interaction.response.defer() 
+
         boss_type_lower = boss_type.lower()
         if boss_type_lower not in WB_BOSS_DATA:
-            await ctx.send(f"❌ El tipo de World Boss '{boss_type}' no existe. Opciones: {', '.join(WB_BOSS_DATA.keys())}")
+            await interaction.followup.send(f"❌ El tipo de World Boss '{boss_type}' no existe. Opciones: {', '.join(WB_BOSS_DATA.keys())}", ephemeral=True)
             return
 
         event_id = f"wb-{random.randint(1000, 9999)}"
@@ -538,8 +565,8 @@ class WorldBossCog(commands.Cog):
 
         event_data = {
             "boss": boss_type_lower,
-            "caller_id": ctx.author.id,
-            "channel_id": ctx.channel.id,
+            "caller_id": interaction.user.id, # Usar interaction.user.id
+            "channel_id": interaction.channel_id, # Usar interaction.channel_id
             "thread_id": None,
             "message_id": None,
             "inscriptions": {role: [] for role in WB_BOSS_DATA[boss_type_lower]["roles"].keys()},
@@ -565,42 +592,51 @@ class WorldBossCog(commands.Cog):
                 inline=False
             )
 
-        view = WB_RoleSelectorView(boss_type_lower, event_id, ctx.author.id, self.bot) # Pasa la instancia del bot
+        view = WB_RoleSelectorView(boss_type_lower, event_id, interaction.user.id, self.bot) # Pasa la instancia del bot
         
         try:
-            message = await ctx.send(embed=embed, view=view)
+            # En comandos de barra, usa followup.send() después de defer()
+            message = await interaction.followup.send(embed=embed, view=view)
             event_data["message_id"] = message.id
             event_data["message"] = message
 
-            if isinstance(ctx.channel, discord.TextChannel):
+            if isinstance(interaction.channel, discord.TextChannel): # Usar interaction.channel
                 thread = await message.create_thread(name=f"WB {WB_BOSS_DATA[boss_type_lower]['name']}", auto_archive_duration=60)
                 event_data["thread_id"] = thread.id
-                await thread.send(f"¡Hilo de discusión para el World Boss '{WB_BOSS_DATA[boss_type_lower]['name']}'! <@{ctx.author.id}>", silent=True)
+                await thread.send(f"¡Hilo de discusión para el World Boss '{WB_BOSS_DATA[boss_type_lower]['name']}'! <@{interaction.user.id}>", silent=True)
         except Exception as e:
             print(f"Error al enviar mensaje o crear hilo para WB: {e}")
-            await ctx.send("❌ Hubo un error al crear el evento de World Boss. Intenta de nuevo más tarde.")
+            await interaction.followup.send("❌ Hubo un error al crear el evento de World Boss. Intenta de nuevo más tarde.", ephemeral=True)
             if event_id in wb_events:
                 del wb_events[event_id]
             return
         
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            print("No tengo permisos para borrar el mensaje del comando original.")
-        except discord.NotFound:
-            pass
+        # No se borra el mensaje de comando original en slash commands
+        # try:
+        #     await ctx.message.delete()
+        # except discord.Forbidden:
+        #     print("No tengo permisos para borrar el mensaje del comando original.")
+        # except discord.NotFound:
+        #     pass
 
-    @commands.command(name="wbadd", aliases=["addwb"])
-    async def wb_add_user(self, ctx, event_id: str, role_name: str, user: discord.Member):
+    @app_commands.command(name="wbadd", description="Añade un usuario a un rol específico de un evento WB.")
+    @app_commands.describe(
+        event_id="ID del evento WB (ej. wb-1234)",
+        role_name="Nombre del rol al que añadir (ej. Main Tank)",
+        user="Usuario a añadir"
+    )
+    async def wb_add_user(self, interaction: discord.Interaction, event_id: str, role_name: str, user: discord.Member):
+        await interaction.response.defer(ephemeral=True) # Deferir la respuesta
+
         if event_id not in wb_events:
-            await ctx.send("❌ ID de evento WB no encontrado.", ephemeral=True)
+            await interaction.followup.send("❌ ID de evento WB no encontrado.", ephemeral=True)
             return
         
         event_data = wb_events[event_id]
         boss_type = event_data["boss"]
         
         if role_name not in WB_BOSS_DATA[boss_type]["roles"]:
-            await ctx.send(f"❌ Rol '{role_name}' no existe para este WB.", ephemeral=True)
+            await interaction.followup.send(f"❌ Rol '{role_name}' no existe para este WB.", ephemeral=True)
             return
 
         user_id = user.id
@@ -619,25 +655,31 @@ class WorldBossCog(commands.Cog):
         if len(inscriptions_for_role) < role_limit:
             if user_id not in inscriptions_for_role:
                 inscriptions_for_role.append(user_id)
-                await ctx.send(f"✅ <@{user_id}> ha sido añadido como **{role_name}**.", ephemeral=True)
+                await interaction.followup.send(f"✅ <@{user_id}> ha sido añadido como **{role_name}**.", ephemeral=True)
             else:
-                await ctx.send(f"ℹ️ <@{user_id}> ya está inscrito como **{role_name}**.", ephemeral=True)
+                await interaction.followup.send(f"ℹ️ <@{user_id}> ya está inscrito como **{role_name}**.", ephemeral=True)
         else:
             # Rol lleno, añadir a lista de espera
             waitlist_for_role = event_data["waitlist"].setdefault(role_name, [])
             if user_id not in waitlist_for_role:
                 waitlist_for_role.append(user_id)
-                await ctx.send(f"⚠️ El rol de **{role_name}** está lleno. <@{user_id}> ha sido añadido a la lista de espera.", ephemeral=True)
+                await interaction.followup.send(f"⚠️ El rol de **{role_name}** está lleno. <@{user_id}> ha sido añadido a la lista de espera.", ephemeral=True)
             else:
-                await ctx.send(f"ℹ️ <@{user_id}> ya está en la lista de espera de **{role_name}**.", ephemeral=True)
+                await interaction.followup.send(f"ℹ️ <@{user_id}> ya está en la lista de espera de **{role_name}**.", ephemeral=True)
         
         await update_wb_embed(event_id, self.bot) # Pasa la instancia del bot
 
 
-    @commands.command(name="wbremove", aliases=["removewb"])
-    async def wb_remove_user(self, ctx, event_id: str, user: discord.Member):
+    @app_commands.command(name="wbremove", description="Remueve un usuario de un evento WB.")
+    @app_commands.describe(
+        event_id="ID del evento WB (ej. wb-1234)",
+        user="Usuario a remover"
+    )
+    async def wb_remove_user(self, interaction: discord.Interaction, event_id: str, user: discord.Member):
+        await interaction.response.defer(ephemeral=True) # Deferir la respuesta
+
         if event_id not in wb_events:
-            await ctx.send("❌ ID de evento WB no encontrado.", ephemeral=True)
+            await interaction.followup.send("❌ ID de evento WB no encontrado.", ephemeral=True)
             return
         
         event_data = wb_events[event_id]
@@ -653,7 +695,7 @@ class WorldBossCog(commands.Cog):
                 if event_data["waitlist"].get(role_name):
                     next_player_id = event_data["waitlist"][role_name].pop(0)
                     event_data["inscriptions"][role_name].append(next_player_id)
-                    await ctx.send(f"<@{next_player_id}>, ¡has sido movido de la lista de espera al rol de **{role_name}**!", ephemeral=False)
+                    await interaction.followup.send(f"<@{next_player_id}>, ¡has sido movido de la lista de espera al rol de **{role_name}**!", ephemeral=False)
                 break
             if user_id in event_data["waitlist"].get(role_name, []):
                 event_data["waitlist"][role_name].remove(user_id)
@@ -661,10 +703,10 @@ class WorldBossCog(commands.Cog):
                 break
         
         if found:
-            await ctx.send(f"✅ <@{user_id}> ha sido removido del evento WB.", ephemeral=True)
+            await interaction.followup.send(f"✅ <@{user_id}> ha sido removido del evento WB.", ephemeral=True)
             await update_wb_embed(event_id, self.bot)
         else:
-            await ctx.send(f"ℹ️ <@{user_id}> no estaba inscrito en este evento WB.", ephemeral=True)
+            await interaction.followup.send(f"ℹ️ <@{user_id}> no estaba inscrito en este evento WB.", ephemeral=True)
 
     @tasks.loop(seconds=60)
     async def cleanup_wb_events(self):
