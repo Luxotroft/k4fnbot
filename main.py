@@ -632,7 +632,7 @@ PLANTILLA_CANALES = [
     ]),
 ]
 
-# Roles creados o reutilizados sin modificar permisos de roles ya existentes.
+# Permisos seguros de servidor para roles administrados por la plantilla.
 ROLES_PLANTILLA = [
     ("🟣 Thetford", discord.Colour.from_rgb(116, 68, 165)),
     ("🛡️ Staff", discord.Colour.from_rgb(195, 68, 68)),
@@ -640,6 +640,26 @@ ROLES_PLANTILLA = [
     ("⭐ Veterano", discord.Colour.from_rgb(76, 171, 150)),
     ("🤖 Bots", discord.Colour.from_rgb(112, 119, 129)),
 ]
+
+def permisos_rol(nombre):
+    # No se conceden Administrador, Gestionar roles ni Gestionar canales.
+    p = discord.Permissions.none()
+    p.update(view_channel=True, read_message_history=True,
+             send_messages=True, send_messages_in_threads=True,
+             add_reactions=True, embed_links=True, attach_files=True,
+             use_external_emojis=True, use_external_stickers=True,
+             use_application_commands=True, connect=True, speak=True,
+             stream=True, use_voice_activation=True, use_embedded_activities=True)
+    if nombre == "🛡️ Staff":
+        p.update(manage_messages=True, moderate_members=True, kick_members=True,
+                 manage_threads=True, move_members=True, mute_members=True,
+                 deafen_members=True)
+    elif nombre == "📯 Caller":
+        p.update(move_members=True, mute_members=True)
+    elif nombre == "🤖 Bots":
+        # Los permisos especiales de cada bot se otorgan individualmente.
+        p = discord.Permissions.none()
+    return p
 
 def permisos_plantilla(guild, roles, nivel):
     everyone = guild.default_role
@@ -681,16 +701,42 @@ class ConfirmarCanalesView(discord.ui.View):
             role = discord.utils.get(guild.roles, name=nombre)
             if role is None:
                 try:
-                    role = await guild.create_role(name=nombre, colour=color, permissions=discord.Permissions.none(), reason=f"Plantilla Thetford confirmada por {interaction.user}")
+                    role = await guild.create_role(name=nombre, colour=color, permissions=permisos_rol(nombre), reason=f"Plantilla Thetford confirmada por {interaction.user}")
                     creados.append(f"Rol: {nombre}")
                 except (discord.Forbidden, discord.HTTPException) as exc:
                     errores.append(f"Rol {nombre}: {exc}")
                     continue
             else:
                 existentes.append(f"Rol: {nombre}")
+                try:
+                    if role >= me.top_role:
+                        errores.append(f"Rol {nombre}: está sobre el bot; no se pueden actualizar sus permisos")
+                    else:
+                        await role.edit(permissions=permisos_rol(nombre), reason=f"Permisos Thetford confirmados por {interaction.user}")
+                except (discord.Forbidden, discord.HTTPException) as exc:
+                    errores.append(f"Permisos del rol {nombre}: {exc}")
             roles[nombre] = role
         if "🟣 Thetford" not in roles or "🛡️ Staff" not in roles:
             return await interaction.edit_original_response(content="❌ No se pudo crear o encontrar Thetford y Staff. " + "; ".join(errores[:3]), view=None)
+        # Orden de menor a mayor prioridad. Discord exige que el bot esté
+        # por encima de cada rol que intenta mover.
+        orden_bajo_a_alto = ["🤖 Bots", "🟣 Thetford", "⭐ Veterano", "📯 Caller", "🛡️ Staff"]
+        movibles = [roles[n] for n in orden_bajo_a_alto if n in roles and roles[n] < me.top_role]
+        for n in orden_bajo_a_alto:
+            if n in roles and roles[n] >= me.top_role:
+                errores.append(f"Jerarquía {n}: el rol está a la altura o por encima del bot")
+        if movibles:
+            try:
+                # Colocarlos consecutivos justo debajo del rol más alto del bot.
+                # No mueve el rol propio del bot ni toca roles superiores.
+                inicio = max(1, me.top_role.position - len(movibles))
+                await guild.edit_role_positions(
+                    positions={rol: inicio + i for i, rol in enumerate(movibles)},
+                    reason=f"Jerarquía Thetford confirmada por {interaction.user}"
+                )
+                existentes.append("Jerarquía: Staff > Caller > Veterano > Thetford > Bots")
+            except (discord.Forbidden, discord.HTTPException, ValueError) as exc:
+                errores.append(f"Orden de roles: {exc}")
         canales_encontrados = {}
         for nombre_cat, canales in PLANTILLA_CANALES:
             try:
@@ -700,6 +746,9 @@ class ConfirmarCanalesView(discord.ui.View):
                     creados.append(f"Categoría: {nombre_cat}")
                 else:
                     existentes.append(f"Categoría: {nombre_cat}")
+                    # Se actualizan overwrites de la categoría sin eliminar permisos ajenos.
+                    for objetivo, overwrite in permisos_plantilla(guild, roles, canales[0][2]).items():
+                        await categoria.set_permissions(objetivo, overwrite=overwrite, reason="Sincronizar permisos Thetford")
             except (discord.Forbidden, discord.HTTPException) as exc:
                 errores.append(f"Categoría {nombre_cat}: {exc}")
                 continue
@@ -708,6 +757,11 @@ class ConfirmarCanalesView(discord.ui.View):
                 if encontrado is not None:
                     existentes.append(f"{nombre_cat} / {nombre}")
                     canales_encontrados[nombre] = encontrado
+                    try:
+                        for objetivo, overwrite in permisos_plantilla(guild, roles, nivel).items():
+                            await encontrado.set_permissions(objetivo, overwrite=overwrite, reason="Sincronizar permisos Thetford")
+                    except (discord.Forbidden, discord.HTTPException) as exc:
+                        errores.append(f"Permisos de {nombre}: {exc}")
                     continue
                 try:
                     overwrites = permisos_plantilla(guild, roles, nivel)
@@ -722,7 +776,7 @@ class ConfirmarCanalesView(discord.ui.View):
         # Canales especializados: se aplica a canales recién creados; existentes quedan intactos.
         for nombre, rol_nombre in [("⭐│veteranos-chat", "⭐ Veterano"), ("📯│callers", "📯 Caller")]:
             canal = canales_encontrados.get(nombre)
-            if canal and f"{canal.category.name} / {nombre}" in creados and rol_nombre in roles:
+            if canal and rol_nombre in roles:
                 try:
                     await canal.set_permissions(roles[rol_nombre], view_channel=True, read_message_history=True, send_messages=True, add_reactions=True, embed_links=True, attach_files=True, reason="Acceso especial Thetford")
                 except (discord.Forbidden, discord.HTTPException) as exc:
@@ -734,7 +788,7 @@ class ConfirmarCanalesView(discord.ui.View):
             try: save()
             except OSError as exc: errores.append(f"Guardar configuración: {exc}")
         resultado = (f"🟣 **Configuración finalizada**\nCreados: **{len(creados)}** · Ya existentes: **{len(existentes)}** · Errores: **{len(errores)}**\n\n"
-                     "Los roles y canales existentes NO se modificaron. Revisa sus permisos manualmente.\n"
+                     "Los roles y permisos de canales existentes se sincronizaron (sin borrar canales).\n"
                      "Para el panel de verificación usa `/publicar_verificacion` con las dos imágenes.")
         if errores: resultado += "\n\n⚠️ " + "\n".join(errores[:5])
         await interaction.edit_original_response(content=resultado[:1900], view=None)
@@ -764,7 +818,8 @@ async def previsualizar_canales(interaction: discord.Interaction):
         for nombre, tipo, nivel in canales:
             texto.append(f"{'🔊' if tipo == 'voice' else '#'} {nombre} · {'público' if nivel == 'public' else 'Thetford' if nivel == 'member' else 'staff'}")
         texto.append("")
-    texto.append("Los miembros Thetford tendrán GIF, reacciones, archivos y actividades de voz. No se modificarán roles ni canales existentes.")
+    texto.append("Jerarquía prevista (de arriba hacia abajo): Staff > Caller > Veterano > Thetford > Bots, debajo del bot. Se reordenarán los roles existentes administrables.")
+    texto.append("Al confirmar se actualizarán permisos de los roles y canales de esta plantilla, incluso si ya existen. No se borrarán canales ni se concederá Administrador.")
     # Discord limita los mensajes a 2000 caracteres.
     contenido = "\n".join(texto)
     if len(contenido) > 1950:
