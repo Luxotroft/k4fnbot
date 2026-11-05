@@ -1,0 +1,5 @@
+.env
+data.json
+ejemplos_thetford/
+__pycache__/
+*.pyc
