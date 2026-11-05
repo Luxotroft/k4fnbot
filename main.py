@@ -589,6 +589,188 @@ async def on_ready():
     print(f"Bot conectado como {bot.user}")
 
 # ───────────────────────── /crearcomp ─────────────────────────
+
+# ─────────────── ASISTENTE DE CANALES DE THETFORD ───────────────
+# Vista previa privada: NO crea nada hasta pulsar Confirmar.
+PLANTILLA_CANALES = [
+    ("💎 ─ [ ◈ ] INFORMACIÓN", [
+        ("📩│bienvenida", "text", "public"),
+        ("📜│reglas-y-normas", "text", "public"),
+        ("🪪│como-verificar", "text", "public"),
+        ("💎│verificacion-faccion", "text", "public"),
+        ("📣│anuncios-oficiales", "text", "member"),
+        ("🎫│tickets", "text", "public"),
+    ]),
+    ("💬 ─ [ ◈ ] COMUNIDAD", [
+        ("💬│chat-general", "text", "member"),
+        ("⚔️│pings-pvp", "text", "member"),
+        ("📯│pings-pve", "text", "member"),
+        ("🎬│clips-y-memes", "text", "member"),
+        ("🎵│musica", "text", "member"),
+        ("🛒│mercado", "text", "member"),
+    ]),
+    ("🎉 │ EVENTOS", [
+        ("🎯│eventos", "text", "member"),
+        ("🎁│sorteos-y-premios", "text", "member"),
+        ("📋│composiciones", "text", "member"),
+    ]),
+    ("⚔️ │ BUILDS", [
+        ("⚔️│builds-zvz", "text", "member"),
+        ("🛠️│builds-pve", "text", "member"),
+    ]),
+    ("🔊 ─ [ ◈ ] VOZ", [
+        ("🔊│voz-general", "voice", "member"),
+        ("🟣│party-1", "voice", "member"),
+        ("🟣│party-2", "voice", "member"),
+        ("⚔️│cta", "voice", "member"),
+    ]),
+    ("🔒 ─ [ ⭐ ] ZONA EXCLUSIVA", [
+        ("🛡️│solicitudes-verificacion", "text", "staff"),
+        ("🔒│staff-chat", "text", "staff"),
+        ("⭐│veteranos-chat", "text", "staff"),
+        ("📯│callers", "text", "staff"),
+    ]),
+]
+
+# Roles creados o reutilizados sin modificar permisos de roles ya existentes.
+ROLES_PLANTILLA = [
+    ("🟣 Thetford", discord.Colour.from_rgb(116, 68, 165)),
+    ("🛡️ Staff", discord.Colour.from_rgb(195, 68, 68)),
+    ("📯 Caller", discord.Colour.from_rgb(221, 156, 60)),
+    ("⭐ Veterano", discord.Colour.from_rgb(76, 171, 150)),
+    ("🤖 Bots", discord.Colour.from_rgb(112, 119, 129)),
+]
+
+def permisos_plantilla(guild, roles, nivel):
+    everyone = guild.default_role
+    base = {everyone: discord.PermissionOverwrite(view_channel=(nivel == "public"))}
+    miembro, staff = roles["🟣 Thetford"], roles["🛡️ Staff"]
+    if nivel == "public":
+        base[everyone] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=False, add_reactions=False)
+    elif nivel == "member":
+        base[miembro] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=True, add_reactions=True, embed_links=True, attach_files=True, use_external_emojis=True, use_external_stickers=True, send_messages_in_threads=True, create_public_threads=True, use_application_commands=True, connect=True, speak=True, stream=True, use_voice_activation=True, use_embedded_activities=True)
+    elif nivel == "staff":
+        base[staff] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=True, add_reactions=True, embed_links=True, attach_files=True, use_application_commands=True, connect=True, speak=True)
+    # El staff también puede administrar y consultar canales públicos y de miembros.
+    if nivel != "staff":
+        base[staff] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=True, add_reactions=True, embed_links=True, attach_files=True, connect=True, speak=True, use_embedded_activities=True)
+    return base
+
+class ConfirmarCanalesView(discord.ui.View):
+    def __init__(self, solicitante):
+        super().__init__(timeout=180)
+        self.solicitante = solicitante
+        self.ejecutando = False
+
+    @discord.ui.button(label="Confirmar roles y canales", style=discord.ButtonStyle.success, emoji="✅")
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.solicitante or not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("Solo el administrador que pidió la vista previa puede confirmar.", ephemeral=True)
+        if self.ejecutando:
+            return await interaction.response.send_message("Ya se está ejecutando.", ephemeral=True)
+        guild = interaction.guild
+        me = guild.me
+        if not (me.guild_permissions.manage_channels and me.guild_permissions.manage_roles):
+            return await interaction.response.send_message("El bot necesita Gestionar canales y Gestionar roles.", ephemeral=True)
+        self.ejecutando = True
+        for item in self.children: item.disabled = True
+        await interaction.response.edit_message(content="⏳ Creando roles y canales que faltan…", view=self)
+        creados, existentes, errores = [], [], []
+        roles = {}
+        for nombre, color in ROLES_PLANTILLA:
+            role = discord.utils.get(guild.roles, name=nombre)
+            if role is None:
+                try:
+                    role = await guild.create_role(name=nombre, colour=color, permissions=discord.Permissions.none(), reason=f"Plantilla Thetford confirmada por {interaction.user}")
+                    creados.append(f"Rol: {nombre}")
+                except (discord.Forbidden, discord.HTTPException) as exc:
+                    errores.append(f"Rol {nombre}: {exc}")
+                    continue
+            else:
+                existentes.append(f"Rol: {nombre}")
+            roles[nombre] = role
+        if "🟣 Thetford" not in roles or "🛡️ Staff" not in roles:
+            return await interaction.edit_original_response(content="❌ No se pudo crear o encontrar Thetford y Staff. " + "; ".join(errores[:3]), view=None)
+        canales_encontrados = {}
+        for nombre_cat, canales in PLANTILLA_CANALES:
+            try:
+                categoria = discord.utils.get(guild.categories, name=nombre_cat)
+                if categoria is None:
+                    categoria = await guild.create_category(name=nombre_cat, overwrites=permisos_plantilla(guild, roles, canales[0][2]), reason=f"Plantilla Thetford confirmada por {interaction.user}")
+                    creados.append(f"Categoría: {nombre_cat}")
+                else:
+                    existentes.append(f"Categoría: {nombre_cat}")
+            except (discord.Forbidden, discord.HTTPException) as exc:
+                errores.append(f"Categoría {nombre_cat}: {exc}")
+                continue
+            for nombre, tipo, nivel in canales:
+                encontrado = discord.utils.get(categoria.channels, name=nombre)
+                if encontrado is not None:
+                    existentes.append(f"{nombre_cat} / {nombre}")
+                    canales_encontrados[nombre] = encontrado
+                    continue
+                try:
+                    overwrites = permisos_plantilla(guild, roles, nivel)
+                    if tipo == "voice":
+                        canal = await guild.create_voice_channel(nombre, category=categoria, overwrites=overwrites, reason="Plantilla Thetford")
+                    else:
+                        canal = await guild.create_text_channel(nombre, category=categoria, overwrites=overwrites, reason="Plantilla Thetford")
+                    canales_encontrados[nombre] = canal
+                    creados.append(f"{nombre_cat} / {nombre}")
+                except (discord.Forbidden, discord.HTTPException) as exc:
+                    errores.append(f"{nombre}: {exc}")
+        # Canales especializados: se aplica a canales recién creados; existentes quedan intactos.
+        for nombre, rol_nombre in [("⭐│veteranos-chat", "⭐ Veterano"), ("📯│callers", "📯 Caller")]:
+            canal = canales_encontrados.get(nombre)
+            if canal and f"{canal.category.name} / {nombre}" in creados and rol_nombre in roles:
+                try:
+                    await canal.set_permissions(roles[rol_nombre], view_channel=True, read_message_history=True, send_messages=True, add_reactions=True, embed_links=True, attach_files=True, reason="Acceso especial Thetford")
+                except (discord.Forbidden, discord.HTTPException) as exc:
+                    errores.append(f"Permisos {nombre}: {exc}")
+        publico = canales_encontrados.get("💎│verificacion-faccion")
+        staff = canales_encontrados.get("🛡️│solicitudes-verificacion")
+        if isinstance(publico, discord.TextChannel) and isinstance(staff, discord.TextChannel):
+            db['verification'][str(guild.id)] = {'public_channel': publico.id, 'staff_channel': staff.id, 'member_role': roles['🟣 Thetford'].id, 'staff_role': roles['🛡️ Staff'].id}
+            try: save()
+            except OSError as exc: errores.append(f"Guardar configuración: {exc}")
+        resultado = (f"🟣 **Configuración finalizada**\nCreados: **{len(creados)}** · Ya existentes: **{len(existentes)}** · Errores: **{len(errores)}**\n\n"
+                     "Los roles y canales existentes NO se modificaron. Revisa sus permisos manualmente.\n"
+                     "Para el panel de verificación usa `/publicar_verificacion` con las dos imágenes.")
+        if errores: resultado += "\n\n⚠️ " + "\n".join(errores[:5])
+        await interaction.edit_original_response(content=resultado[:1900], view=None)
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.solicitante:
+            return await interaction.response.send_message("Esta vista previa no es tuya.", ephemeral=True)
+        await interaction.response.edit_message(content="❌ Cancelado. No se creó ningún rol ni canal.", view=None)
+
+@bot.tree.command(name="previsualizar_canales", description="Vista previa de roles y canales de Thetford; confirma antes de crear")
+@app_commands.guild_only()
+@app_commands.default_permissions(administrator=True)
+async def previsualizar_canales(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("Necesitas ser administrador.", ephemeral=True)
+    if not (interaction.guild.me.guild_permissions.manage_channels and interaction.guild.me.guild_permissions.manage_roles):
+        return await interaction.response.send_message("El bot necesita Gestionar canales y Gestionar roles.", ephemeral=True)
+    guild = interaction.guild
+    texto = ["🟣 **VISTA PREVIA — THETFORD**", "**No se creará nada hasta que confirmes.**", "", "**ROLES**"]
+    for nombre, _ in ROLES_PLANTILLA:
+        estado = "ya existe" if discord.utils.get(guild.roles, name=nombre) else "se creará"
+        texto.append(f"• {nombre} — {estado}")
+    texto.append("")
+    for categoria, canales in PLANTILLA_CANALES:
+        texto.append(f"**{categoria}**")
+        for nombre, tipo, nivel in canales:
+            texto.append(f"{'🔊' if tipo == 'voice' else '#'} {nombre} · {'público' if nivel == 'public' else 'Thetford' if nivel == 'member' else 'staff'}")
+        texto.append("")
+    texto.append("Los miembros Thetford tendrán GIF, reacciones, archivos y actividades de voz. No se modificarán roles ni canales existentes.")
+    # Discord limita los mensajes a 2000 caracteres.
+    contenido = "\n".join(texto)
+    if len(contenido) > 1950:
+        contenido = contenido[:1920] + "\n…"
+    await interaction.response.send_message(contenido, view=ConfirmarCanalesView(interaction.user.id), ephemeral=True)
+
 @bot.tree.command(name="crearcomp", description="Crea una composición (hasta 20 roles separados por ;)")
 @app_commands.describe(
     nombre="Nombre de la composición",
